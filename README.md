@@ -1,24 +1,35 @@
 # Polyweb
 
-A small isometric, turn-based strategy game that runs in the browser, inspired by *The Battle of Polytopia*
-(original art and code; not affiliated with Midjiwan). No build step, no dependencies.
+A turn-based isometric strategy game for the browser, inspired by *The Battle of Polytopia*.
+It has original art and code and is not affiliated with Midjiwan. There is no build step and no dependencies.
 
 ## Play
 
-Open `index.html` in a browser, or serve the folder (`python3 -m http.server`).
-On GitHub: **Settings → Pages → Source: GitHub Actions**. The included workflow then publishes the game on every push to `main`.
+- **Locally:** open `index.html`, or serve the folder (`python3 -m http.server`) and visit `http://localhost:8000`.
+- **GitHub Pages:** `.github/workflows/pages.yml` deploys the game on every push to `main`. Turn it on under
+  **Settings → Pages → Source: GitHub Actions**. Pages on a private repository needs a paid GitHub plan; on the free plan, make the repository public first.
 
-## How to play
+## Features
 
-- **Goal:** capture every rival city. You lose if you lose all of yours.
-- **Move / attack:** tap a unit, then a highlighted tile (white = move, red = attack). A unit can move then attack; attacking ends its turn.
-- **Villages 🏘️:** walk a unit onto one to claim it. Walk onto an empty enemy city to capture it.
-- **Cities:** produce ⭐ per turn equal to their level. Select a city with no unit on it to train Warriors, Archers (range 2), Riders (move 2) or Defenders.
-- **Harvest** 🍎/🦌 inside your borders (⭐2) to grow population. Full population levels a city up (more income; larger borders at level 3).
-- Idle units heal. Cities and forests give defence bonuses. Mountains are impassable. Fog hides unscouted land.
-- **Controls:** drag to pan, wheel/pinch to zoom, `E` ends turn, `Esc` deselects. The game autosaves each turn.
+- **Six tribes** (Zephyr, Ember, Verdant, Solis, Granite, Frost), each starting with a different technology.
+- **2–6 tribes** on 12×12 to 24×24 maps: Continents, Pangea or Archipelago.
+- **Game modes:** Domination (last tribe standing) and Perfection (highest score after 30 turns).
+- **Difficulty:** Easy, Normal, Hard, Crazy (computer income bonus).
+- **Pass and play:** set any extra player to Human to play hot-seat on one device, with a hand-over screen between turns.
+- **Tech tree** of 15 technologies in five branches: Riding, Organization, Climbing, Fishing, Hunting.
+- **Units:** Warrior, Rider, Archer, Defender, Swordsman, Knight, Catapult and the Giant super unit. Units board boats on shallow water (Sailing) and become ships that cross the ocean (Navigation).
+- **Cities** grow by harvesting fruit, animals and fish or building farms, mines, lumber huts and ports. Every level offers a reward choice: workshop or explorer, walls or resources, population or border growth, park or Giant.
+- **Ruins** hold treasure, free technology, maps or a veteran swordsman.
+- **Combat** uses attack/defence/health with city, wall, forest and mountain bonuses. Melee winners advance, idle units heal, and three kills make a veteran.
+- **Fog of war**, unit limits per city, computer opponents that research, build, expand and use boats.
+- **Autosave** to the browser after every turn, sound effects with a mute toggle, mouse and touch controls.
+
+## Controls
+
+Drag to pan, scroll or pinch to zoom. Tap a unit, then a white tile to move or a red tile to attack.
+Keyboard: `E` end turn, `N` next unit, `T` technology, `Esc` close or deselect.
 
 ## Files
 
-- `index.html`, `style.css`: UI shell
-- `game.js`: map generation, rules, AI and canvas rendering
+- `index.html`, `style.css`: page shell, menus and HUD
+- `game.js`: map generation, rules, computer players, rendering and input

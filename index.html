@@ -2,8 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Polyweb – a tiny turn-based strategy game</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Polyweb</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@400;600;800&display=swap">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -13,12 +16,16 @@
   <div id="hud-left">
     <span id="turn"></span>
     <span id="stars"></span>
+    <span id="ucount" title="Units / unit limit"></span>
   </div>
   <div id="scores"></div>
   <div id="hud-right">
-    <button id="btn-help" title="How to play">?</button>
-    <button id="btn-menu" title="Menu">☰</button>
-    <button id="btn-end" class="primary">End turn</button>
+    <button id="btn-tech" title="Technology (T)">🔬 Tech</button>
+    <button id="btn-next" title="Next unit with moves left (N)">Next unit</button>
+    <button id="btn-sound" title="Sound on/off" aria-label="Toggle sound">🔊</button>
+    <button id="btn-help" title="How to play" aria-label="How to play">?</button>
+    <button id="btn-menu" title="Menu" aria-label="Menu">☰</button>
+    <button id="btn-end" class="primary" title="End turn (E)">End turn</button>
   </div>
 </div>
 
@@ -27,39 +34,74 @@
   <div id="actions"></div>
 </div>
 
-<div id="toast"></div>
+<div id="toast" role="status" aria-live="polite"></div>
 
 <div id="menu" class="overlay">
-  <div class="card">
+  <div class="card menu-card">
     <h1>Polyweb</h1>
-    <p class="muted">A small turn-based strategy game for the browser, inspired by the 4X classics.
-      Expand, harvest, train armies and conquer rival tribes.</p>
-    <label>Rival tribes
-      <select id="opt-opp"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option></select>
-    </label>
-    <label>Map size
-      <select id="opt-size"><option value="12">Small (12×12)</option><option value="16" selected>Medium (16×16)</option><option value="20">Large (20×20)</option></select>
-    </label>
+    <p class="muted lede">Lead a tribe from a single village to a world-spanning empire. Explore, research, grow your cities and conquer.</p>
+    <div class="field-grid">
+      <label for="opt-count">Tribes</label>
+      <select id="opt-count"><option>2</option><option selected>3</option><option>4</option><option>5</option><option>6</option></select>
+      <label for="opt-size">Map size</label>
+      <select id="opt-size"><option value="12">Small · 12×12</option><option value="16" selected>Medium · 16×16</option><option value="20">Large · 20×20</option><option value="24">Huge · 24×24</option></select>
+      <label for="opt-map">Map type</label>
+      <select id="opt-map"><option value="continents" selected>Continents</option><option value="pangea">Pangea</option><option value="archipelago">Archipelago</option></select>
+      <label for="opt-mode">Game mode</label>
+      <select id="opt-mode"><option value="domination" selected>Domination · last tribe standing</option><option value="perfection">Perfection · best score in 30 turns</option></select>
+      <label for="opt-diff">Difficulty</label>
+      <select id="opt-diff"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option><option value="crazy">Crazy</option></select>
+    </div>
+    <h3>Players</h3>
+    <div id="slots"></div>
+    <p id="tribe-about" class="muted small"></p>
     <div class="row">
       <button id="btn-new" class="primary">New game</button>
-      <button id="btn-continue">Continue</button>
-      <button id="btn-resume">Resume</button>
+      <button id="btn-continue">Continue saved game</button>
+      <button id="btn-resume">Back to game</button>
     </div>
-    <p><a href="#" id="link-help">How to play</a></p>
+    <p class="small"><a href="#" id="link-help">How to play</a></p>
+  </div>
+</div>
+
+<div id="tech" class="overlay" hidden>
+  <div class="card wide">
+    <h2>Technology</h2>
+    <p id="tech-stars" class="muted"></p>
+    <div id="tech-tree"></div>
+    <div class="row"><button id="btn-tech-close" class="primary">Close</button></div>
+  </div>
+</div>
+
+<div id="reward" class="overlay" hidden>
+  <div class="card">
+    <h2 id="reward-title"></h2>
+    <p class="muted">Choose a reward for your growing city.</p>
+    <div id="reward-opts"></div>
+  </div>
+</div>
+
+<div id="pass" class="overlay solid" hidden>
+  <div class="card">
+    <h2 id="pass-title"></h2>
+    <p id="pass-text" class="muted"></p>
+    <div class="row"><button id="btn-pass" class="primary">Start my turn</button></div>
   </div>
 </div>
 
 <div id="help" class="overlay" hidden>
-  <div class="card">
+  <div class="card wide">
     <h2>How to play</h2>
     <ul>
-      <li><b>Goal:</b> capture every rival city. You lose if you lose all yours.</li>
-      <li><b>Move</b> a unit: tap it, then a highlighted tile. <b>Attack</b>: tap a red-marked enemy. A unit may move, then attack; attacking ends its turn.</li>
-      <li><b>Villages 🏘️</b>: walk a unit onto one to turn it into your city. Walk onto an empty enemy city to capture it.</li>
-      <li><b>Cities</b> give ⭐ stars each turn equal to their level. Select a city (with no unit on it) to <b>train</b> units.</li>
-      <li><b>Harvest</b> 🍎 fruit or 🦌 animals inside your borders (⭐2) to grow the city's population. Full population levels the city up: more income and bigger borders.</li>
-      <li>Units that skip a turn heal. Cities and forests give a defence bonus. Mountains are impassable. Fog hides what you haven't scouted.</li>
-      <li><b>Controls:</b> drag to pan, wheel/pinch to zoom, <kbd>E</kbd> ends turn, <kbd>Esc</kbd> deselects.</li>
+      <li><b>Win</b> in Domination by capturing every rival city. In Perfection, have the highest score after 30 turns.</li>
+      <li><b>Move and attack.</b> Tap a unit, then a white tile to move or a red tile to attack. A unit can move then attack. Attacking ends its turn.</li>
+      <li><b>Villages 🏘️ and ruins 🏛️.</b> Walk onto a village to make it your city. Explore ruins for stars, tech, maps or a veteran. Walk into an empty enemy city to capture it.</li>
+      <li><b>Stars ⭐</b> come in every turn from your cities. Spend them on units, technology and city growth.</li>
+      <li><b>Grow cities</b> by harvesting fruit, animals and fish or building farms, mines, lumber huts and ports inside your borders. Each level gives a choice of reward and supports one more unit.</li>
+      <li><b>Technology 🔬</b> unlocks units, harvests and movement: Climbing for mountains, Sailing for boats, Navigation for deep ocean.</li>
+      <li><b>Combat.</b> Damage depends on attack, defence and health. Cities, walls, forests (with Archery) and mountains (with Climbing) protect defenders. Units that skip a turn heal. Three kills make a veteran.</li>
+      <li><b>Pass and play.</b> Set other players to Human in the menu to play on one device.</li>
+      <li><b>Controls.</b> Drag to pan, scroll or pinch to zoom. <kbd>E</kbd> end turn, <kbd>N</kbd> next unit, <kbd>T</kbd> technology, <kbd>Esc</kbd> close or deselect.</li>
     </ul>
     <div class="row"><button id="btn-help-close" class="primary">Got it</button></div>
   </div>
@@ -68,8 +110,8 @@
 <div id="gameover" class="overlay" hidden>
   <div class="card">
     <h2 id="go-title"></h2>
-    <p id="go-text" class="muted"></p>
-    <div class="row"><button id="btn-again" class="primary">Play again</button></div>
+    <div id="go-text" class="muted"></div>
+    <div class="row"><button id="btn-again" class="primary">New game</button><button id="btn-view">View the map</button></div>
   </div>
 </div>
 
