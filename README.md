@@ -21,6 +21,7 @@ It has original art and code and is not affiliated with Midjiwan. There is no bu
 - **Cities** grow by harvesting fruit, animals and fish or building farms, mines, lumber huts and ports. Every level offers a reward choice: workshop or explorer, walls or resources, population or border growth, park or Giant.
 - **Ruins** hold treasure, free technology, maps or a veteran swordsman.
 - **Combat** uses attack/defence/health with city, wall, forest and mountain bonuses. Melee winners advance, idle units heal, and three kills make a veteran.
+- **Look and feel:** each tribe's homeland has its own climate (meadow, autumn woods, jungle, desert, highland, tundra) with matching trees, rock and wildlife. Low-poly shaded terrain, animated water with surf, clouds over unexplored land, hand-drawn unit figures, cities that grow taller with each level, and particle effects for combat, captures and growth. The main menu shows a living world map.
 - **Fog of war**, unit limits per city, computer opponents that research, build, expand and use boats.
 - **Autosave** to the browser after every turn, sound effects with a mute toggle, mouse and touch controls.
 

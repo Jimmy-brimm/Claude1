@@ -37,6 +37,7 @@ kbd{background:#0006;border:1px solid var(--line);border-radius:4px;padding:0 5p
 #scores .dead{text-decoration:line-through;opacity:.5}
 #scores .thinking{border-color:currentColor;animation:pulse 1s ease-in-out infinite}
 @keyframes pulse{50%{opacity:.55}}
+@keyframes fade{0%,100%{opacity:0}12%,80%{opacity:1}}
 #hud-right{display:flex;gap:6px;flex-wrap:wrap}
 
 /* Bottom dock */
@@ -57,6 +58,16 @@ kbd{background:#0006;border:1px solid var(--line);border-radius:4px;padding:0 5p
 .overlay{position:fixed;inset:0;background:#06101ecc;display:flex;align-items:center;justify-content:center;
   padding:calc(14px + var(--safe-t)) max(14px,var(--safe-r)) calc(14px + var(--safe-b)) max(14px,var(--safe-l));overflow:auto}
 .overlay.solid{background:var(--bg)}
+#menu{background:radial-gradient(ellipse at center,rgba(6,16,30,.15),rgba(6,16,30,.7))}
+#menu .card{background:rgba(23,39,62,.9);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+
+/* Turn banner */
+#banner{position:fixed;left:0;right:0;top:calc(17% + var(--safe-t));display:grid;justify-items:center;gap:2px;pointer-events:none;
+  padding:14px 16px;background:linear-gradient(90deg,transparent,rgba(6,16,30,.82) 25%,rgba(6,16,30,.82) 75%,transparent)}
+#banner b{font:400 44px/1 var(--font-display);letter-spacing:1px;text-shadow:0 3px 0 rgba(0,0,0,.45);text-align:center}
+#banner span{font-weight:700;color:var(--text);text-align:center}
+#banner.go{animation:banner 2s ease forwards}
+@keyframes banner{0%{opacity:0;transform:translateX(-40px)}12%{opacity:1;transform:none}80%{opacity:1;transform:none}100%{opacity:0;transform:translateX(40px)}}
 .overlay>.card{margin:auto}
 .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px 22px;width:min(480px,100%);box-shadow:0 18px 50px #0008}
 .card.wide{width:min(940px,100%)}
@@ -107,8 +118,10 @@ kbd{background:#0006;border:1px solid var(--line);border-radius:4px;padding:0 5p
   #reward-opts{grid-template-columns:1fr}
   #hud-right button{padding:6px 9px}
   .card h1{font-size:40px}
+  #banner b{font-size:34px}
 }
 @media (prefers-reduced-motion:reduce){
   #scores .thinking{animation:none}
+  #banner.go{animation:fade 2s ease forwards}
   #toast{transition:none}
 }
