@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Polyweb – a tiny turn-based strategy game</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hud" hidden>
+  <div id="hud-left">
+    <span id="turn"></span>
+    <span id="stars"></span>
+  </div>
+  <div id="scores"></div>
+  <div id="hud-right">
+    <button id="btn-help" title="How to play">?</button>
+    <button id="btn-menu" title="Menu">☰</button>
+    <button id="btn-end" class="primary">End turn</button>
+  </div>
+</div>
+
+<div id="panel" hidden>
+  <div id="info"></div>
+  <div id="actions"></div>
+</div>
+
+<div id="toast"></div>
+
+<div id="menu" class="overlay">
+  <div class="card">
+    <h1>Polyweb</h1>
+    <p class="muted">A small turn-based strategy game for the browser, inspired by the 4X classics.
+      Expand, harvest, train armies and conquer rival tribes.</p>
+    <label>Rival tribes
+      <select id="opt-opp"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option></select>
+    </label>
+    <label>Map size
+      <select id="opt-size"><option value="12">Small (12×12)</option><option value="16" selected>Medium (16×16)</option><option value="20">Large (20×20)</option></select>
+    </label>
+    <div class="row">
+      <button id="btn-new" class="primary">New game</button>
+      <button id="btn-continue">Continue</button>
+      <button id="btn-resume">Resume</button>
+    </div>
+    <p><a href="#" id="link-help">How to play</a></p>
+  </div>
+</div>
+
+<div id="help" class="overlay" hidden>
+  <div class="card">
+    <h2>How to play</h2>
+    <ul>
+      <li><b>Goal:</b> capture every rival city. You lose if you lose all yours.</li>
+      <li><b>Move</b> a unit: tap it, then a highlighted tile. <b>Attack</b>: tap a red-marked enemy. A unit may move, then attack; attacking ends its turn.</li>
+      <li><b>Villages 🏘️</b>: walk a unit onto one to turn it into your city. Walk onto an empty enemy city to capture it.</li>
+      <li><b>Cities</b> give ⭐ stars each turn equal to their level. Select a city (with no unit on it) to <b>train</b> units.</li>
+      <li><b>Harvest</b> 🍎 fruit or 🦌 animals inside your borders (⭐2) to grow the city's population. Full population levels the city up: more income and bigger borders.</li>
+      <li>Units that skip a turn heal. Cities and forests give a defence bonus. Mountains are impassable. Fog hides what you haven't scouted.</li>
+      <li><b>Controls:</b> drag to pan, wheel/pinch to zoom, <kbd>E</kbd> ends turn, <kbd>Esc</kbd> deselects.</li>
+    </ul>
+    <div class="row"><button id="btn-help-close" class="primary">Got it</button></div>
+  </div>
+</div>
+
+<div id="gameover" class="overlay" hidden>
+  <div class="card">
+    <h2 id="go-title"></h2>
+    <p id="go-text" class="muted"></p>
+    <div class="row"><button id="btn-again" class="primary">Play again</button></div>
+  </div>
+</div>
+
+<script src="game.js"></script>
+</body>
+</html>
