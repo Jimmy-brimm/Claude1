@@ -25,6 +25,11 @@ It has original art and code and is not affiliated with Midjiwan. There is no bu
 - **Fog of war**, unit limits per city, computer opponents that research, build, expand and use boats.
 - **Autosave** to the browser after every turn, sound effects with a mute toggle, mouse and touch controls.
 
+## Interface
+
+The layout follows the mobile 4X classics. Score, turn and stars sit across the top. Three round buttons along the bottom open the **Game** menu (tribe standings, sound, help), the **Tech Tree** (a radial tree around your tribe) and **End Turn**, which glows when every unit has acted.
+Tapping a unit, city or tile replaces them with an info panel and round action buttons showing star costs. Cities show population pips under their name. New games start from a tribe picker and a settings screen; Pass & Play has its own player setup.
+
 ## Controls
 
 Drag to pan, scroll or pinch to zoom. Tap a unit, then a white tile to move or a red tile to attack.

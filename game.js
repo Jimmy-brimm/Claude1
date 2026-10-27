@@ -69,7 +69,8 @@ let cam = { x: 0, y: 0, z: 1 }, camGoal = null;
 let sel = null, selMoves = [], selTargets = [], hover = null, fx = [], confirmDisband = null;
 const anims = new Map(), labels = [];
 const $ = id => document.getElementById(id);
-const cv = $('c'), ctx = cv.getContext('2d');
+const cv = $('c');
+let ctx = cv.getContext('2d'); // swapped briefly when painting button icons
 let W = 0, H = 0, dpr = 1;
 
 const cheb = (a, b) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
@@ -789,7 +790,7 @@ function sfx(kind) {
 }
 
 /* ---------- UI ---------- */
-let toastTimer = 0;
+let toastTimer = 0, gameShown = false, techSel = null;
 function toast(msg) {
   const t = $('toast'); t.textContent = msg; t.classList.add('show');
   clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
@@ -805,145 +806,253 @@ function refreshSel() {
   }
 }
 
+const STAR_SVG = '<svg class="star" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3 6.1 20.6l1.3-6.6L2.5 9.4l6.6-.8z"/></svg>';
+const CROWN_SVG = '<svg class="crown" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18V8l5 4 4-7 4 7 5-4v10z"/></svg>';
+const STAT_SVG = {
+  hp: '<svg viewBox="0 0 24 24" fill="#ff6b7a"><path d="M12 21s-7.5-4.6-9.5-9.2C1 8.4 3.2 5 6.6 5c2 0 3.4 1.1 5.4 3 2-1.9 3.4-3 5.4-3 3.4 0 5.6 3.4 4.1 6.8C19.5 16.4 12 21 12 21z"/></svg>',
+  atk: '<svg viewBox="0 0 24 24" fill="#ffd166"><path d="M14 3h7v7L10.5 20.5l-2-2-2.5 2.5L4 19l2.5-2.5-2-2z"/></svg>',
+  def: '<svg viewBox="0 0 24 24" fill="#7ec8ff"><path d="M12 2l8 3v6c0 5-3.5 9-8 11-4.5-2-8-6-8-11V5z"/></svg>',
+  mv: '<svg viewBox="0 0 24 24" fill="#9ff09a"><path d="M4 18h10l6-3v-3h-6l-2-7H7v9l-3 1z"/></svg>',
+  rng: '<svg viewBox="0 0 24 24" fill="none" stroke="#ffb1e0" stroke-width="2.6"><circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="2" fill="#ffb1e0"/></svg>',
+};
+const starCost = n => `<span class="cost">${STAR_SVG}${n}</span>`;
+
+// Button pictures, painted with the same routines as the map.
+const iconCache = new Map();
+function iconURL(key, paint) {
+  if (iconCache.has(key)) return iconCache.get(key);
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const saved = ctx;
+  ctx = c.getContext('2d');
+  try { ctx.translate(64, 64); paint(); } finally { ctx = saved; }
+  const url = c.toDataURL();
+  iconCache.set(key, url);
+  return url;
+}
+const unitIcon = (type, tribe) => iconURL(`u-${type}-${tribe}`, () => {
+  ellipse(0, 40, 30, 10, 'rgba(0,0,0,.16)');
+  ctx.translate(0, 42);
+  const s = type === 'giant' ? 1.35 : type === 'knight' || type === 'rider' ? 1.85 : type === 'catapult' ? 2.3 : 2.15;
+  ctx.scale(s, s);
+  drawBody(type, TRIBES[tribe].color, SKIN[tribe], false);
+});
+const workIcon = (key, cl) => iconURL(`w-${key}-${cl.name}`, () => {
+  if (key === 'mine') { ctx.scale(1.8, 1.8); drawMountain(-2, 12, cl, true); return; }
+  ctx.scale(2.3, 2.3);
+  if (key === 'fruit') drawFruit(0, 9, cl);
+  else if (key === 'animal') drawAnimal(-2, 10, cl);
+  else if (key === 'fish') { ellipse(0, 4, 22, 11, '#4aa8dc'); drawFish(0, 4, 0); }
+  else if (key === 'farm') drawCrop(0, 12);
+  else if (key === 'lumber') { drawTree(-9, 11, cl, 0.95); isoBox(6, 13, 7, 6, '#c39461', '#a07546', '#6b4a2b', 6); }
+  else if (key === 'port') { ellipse(0, 7, 24, 11, '#4aa8dc'); drawPort(-2, 4, 0); }
+});
+const tribeIcon = t => iconURL(`t-${t}`, () => {
+  const cl = CLIMATES[t];
+  ctx.scale(1.65, 1.65);
+  drawLand(0, -12, cl);
+  drawTree(-16, 6, cl, 0.85);
+  ctx.save(); ctx.translate(5, 13); drawBody(TRIBES[t].unit, TRIBES[t].color, SKIN[t], false); ctx.restore();
+});
+
 function ui() {
   if (!G) return;
   const me = G.view, pl = G.players[me];
-  $('turn').textContent = `Turn ${G.turn}${G.mode === 'perfection' ? ' / ' + G.turnLimit : ''}`;
-  $('turn').style.color = pl.color;
-  $('stars').textContent = `⭐ ${pl.stars} (+${income(me)})`;
-  $('ucount').textContent = `⚔️ ${unitCount(me)}/${unitCap(me)}`;
-  const showScore = G.mode === 'perfection';
-  $('scores').innerHTML = G.players.map((p, i) =>
-    `<span class="${p.alive ? '' : 'dead'} ${i === G.cur && busy ? 'thinking' : ''}" style="color:${p.color}">● ${esc(p.name)}${p.ai ? '' : ' 👤'} · 🏙️${cityTiles(i).length}${showScore ? ` · ${score(i)}` : ''}</span>`).join('');
+  $('st-score').textContent = score(me).toLocaleString('en-US');
+  $('st-turn').textContent = G.mode === 'perfection' ? `${G.turn}/${G.turnLimit}` : G.turn;
+  $('st-stars').textContent = pl.stars;
+  $('st-income').textContent = income(me);
+  const t = $('turn-of');
+  if (busy && gameShown && G.players[G.cur]) {
+    const p = G.players[G.cur];
+    t.innerHTML = `<i style="background:${p.color}"></i>${esc(p.name)} is playing<span class="dots"></span>`;
+    t.hidden = false;
+  } else t.hidden = true;
   const ok = canAct();
   $('btn-end').disabled = !ok;
-  $('btn-end').textContent = busy ? `${G.players[G.cur].name}…` : 'End turn';
-  $('btn-next').disabled = !ok;
-  $('btn-tech').disabled = !G || !!G.over;
-  $('btn-sound').textContent = muted ? '🔇' : '🔊';
-  renderPanel();
+  $('btn-end').classList.toggle('ready', ok && !G.units.some(u => u.owner === me && (reach(u).length || targetsFor(u, true).length)));
+  $('btn-tech').disabled = !!G.over;
+  renderSheet();
   if (!$('tech').hidden) renderTech();
+  if (!$('game-menu').hidden) renderGameMenu();
 }
 
-function renderPanel() {
-  const info = $('info'), act = $('actions');
+function renderSheet() {
+  $('bottom').hidden = !gameShown || !!sel;
+  $('sheet').hidden = !gameShown || !sel;
+  if (!gameShown || !sel) return;
+  const act = $('actions'), me = G.view;
   act.innerHTML = '';
-  const me = G.view;
-  if (!sel) {
-    info.innerHTML = '<span class="muted">Tap a unit, city or tile. Capture villages, research tech, grow your cities and conquer the rival tribes.</span>';
-    return;
-  }
+  const setInfo = (title, text) => { $('info-title').innerHTML = title; $('info-text').innerHTML = text; };
   const u0 = sel.kind === 'unit' ? unitById(sel.id) : null;
   const x = u0 ? u0.x : sel.x, y = u0 ? u0.y : sel.y;
-  if (G.vis[me][y][x] === 0) { info.innerHTML = '<span class="muted">Unexplored. Send a unit to scout it.</span>'; return; }
+  if (G.vis[me][y][x] === 0) { setInfo('Clouds', 'Unexplored land. Send a unit to scout it.'); return; }
   const tl = T(x, y), vis = seenByView(x, y);
   const u = u0 || (vis ? unitAt(x, y) : null);
-  const mine = canAct();
-  let html = '';
+  const b = tl.b, mine = canAct(), pl = G.players[me];
+  const hints = [];
+  let title = '', text = '';
+
   if (u) {
-    const d = UNITS[u.type], st = stats(u), pl = G.players[u.owner];
-    const boat = st !== d ? ` <span class="muted">(${st.name} carrying ${d.name})</span>` : '';
-    const status = u.owner !== me ? '' : u.attacked ? ' · done' : u.moved ? ' · can attack' : ' · ready';
-    html += `<div class="row-info"><b style="color:${pl.color}">${st === d ? d.icon : st.icon} ${st === d ? d.name : st.name}</b>${boat} · ${esc(pl.name)} · ❤️ ${u.hp}/${maxHp(u)}${u.vet ? ' · ⭐ veteran' : ''}${status}<br>
-      <span class="muted">Attack ${st.atk} · Defence ${st.def} · Move ${st.mv} · Range ${st.range}${u.kills ? ` · ${u.kills} kill${u.kills > 1 ? 's' : ''}` : ''}</span></div>`;
-  }
-  const b = tl.b;
-  if (b && b.kind === 'village') html += '<div>🏘️ <b>Village</b> <span class="muted">Move a unit here to make it your city.</span></div>';
-  else if (b && b.kind === 'ruin') html += '<div>🏛️ <b>Ancient ruins</b> <span class="muted">Explore with a unit for a surprise.</span></div>';
-  else if (b) {
-    const pl = G.players[b.owner];
-    html += `<div>🏙️ <b style="color:${pl.color}">${esc(b.name)}</b>${b.capital ? ' (capital)' : ''} · ${esc(pl.name)} · level ${b.level}`;
+    const d = UNITS[u.type], st = stats(u), owner = G.players[u.owner];
+    title = `<i class="dot" style="background:${owner.color}"></i>${st === d ? d.name : `${st.name} <small>carrying a ${d.name}</small>`}${u.vet ? ' <small class="vet">★ Veteran</small>' : ''}`;
+    text = `<span class="chips"><span>${STAT_SVG.hp}${u.hp}/${maxHp(u)}</span><span>${STAT_SVG.atk}${st.atk}</span><span>${STAT_SVG.def}${st.def}</span><span>${STAT_SVG.mv}${st.mv}</span><span>${STAT_SVG.rng}${st.range}</span></span>`;
+    text += `<span class="status">${u.owner !== me ? esc(owner.name) : u.attacked ? 'Done for this turn' : u.moved ? 'Can still attack' : 'Ready to move'}</span>`;
+  } else if (b && b.kind === 'city') {
+    const owner = G.players[b.owner];
+    title = `${b.capital ? CROWN_SVG : `<i class="dot" style="background:${owner.color}"></i>`}${esc(b.name)} <small>${b.capital ? 'Capital' : 'City'} · level ${b.level}${b.owner === me ? '' : ` · ${esc(owner.name)}`}</small>`;
     if (b.owner === me) {
-      const extra = (b.workshop || 0) + (b.park || 0);
-      html += `<br><span class="muted">Population ${b.pop}/${b.level >= MAX_LEVEL ? '–' : popNeeded(b)} · +${b.level + extra} ⭐/turn${b.wall ? ' · 🧱 walls' : ''}${b.border ? ' · wide borders' : ''}</span>`;
-    }
-    html += '</div>';
+      const need = b.level >= MAX_LEVEL ? 0 : popNeeded(b);
+      const pips = need ? `<span class="pips" title="Population ${b.pop} of ${need}">${Array.from({ length: need }, (_, i) => `<i class="${i < b.pop ? 'on' : ''}"></i>`).join('')}</span>` : '';
+      text = `${pips}<span>+${b.level + (b.workshop || 0) + (b.park || 0)} ${STAR_SVG} per turn</span>${b.wall ? '<span>City walls</span>' : ''}`;
+    } else text = `<span>Move a unit into the empty city to capture it.</span>`;
+  } else if (b && b.kind === 'village') { title = 'Village'; text = 'Move a unit here to make it your city.'; }
+  else if (b && b.kind === 'ruin') { title = 'Ancient Ruins'; text = 'Explore them with a unit for a surprise.'; }
+  else {
+    const names = { forest: 'Forest', fruit: 'Wild Fruit', animal: 'Wild Animals', crop: 'Crops', fish: 'Fish' };
+    const imps = { farm: 'Farm', lumber: 'Lumber Hut', mine: 'Mine', port: 'Port' };
+    title = tl.imp ? imps[tl.imp] : tl.res ? names[tl.res] : tl.t === 'mountain' ? 'Mountain' : tl.t === 'water' ? 'Shallow Water' : tl.t === 'ocean' ? 'Ocean' : 'Field';
+    const tips = {
+      forest: hasTech(me, 'archery') ? 'Units here defend 50% better.' : 'Research Archery for a defence bonus here.',
+      mountain: hasTech(me, 'climbing') ? 'Units here see further and defend 50% better.' : 'Research Climbing to move here.',
+      water: hasTech(me, 'sailing') ? 'Units can sail here.' : 'Research Sailing to move here.',
+      ocean: hasTech(me, 'navigation') ? 'Ships can cross the deep ocean.' : 'Research Navigation to cross the ocean.',
+    };
+    text = tips[tl.res] || tips[tl.t] || (tl.imp ? 'Adds population to the nearby city.' : tl.res ? 'Harvest it from inside your borders.' : 'Open land.');
   }
-  const resNames = { forest: '🌲 Forest', fruit: '🍎 Fruit', animal: '🦌 Wild animals', crop: '🌾 Crops', fish: '🐟 Fish' };
-  const impNames = { farm: '🌾 Farm', lumber: '🌲 Lumber hut', mine: '⛏️ Mine', port: '⚓ Port' };
-  const bits = [];
-  if (tl.t === 'mountain') bits.push(hasTech(me, 'climbing') ? '⛰️ Mountain' : '⛰️ Mountain (needs 🧗 Climbing)');
-  if (tl.t === 'water') bits.push('Shallow water');
-  if (tl.t === 'ocean') bits.push('Deep ocean');
-  if (tl.res) bits.push(resNames[tl.res]);
-  if (tl.imp) bits.push(impNames[tl.imp]);
-  if (!u && !b && !bits.length) bits.push('Open land');
-  if (bits.length) html += `<div class="muted">${bits.join(' · ')}</div>`;
-  info.innerHTML = html;
-
+  setInfo(title, text);
   if (!mine) return;
-  const addBtn = (label, cost, disabled, fn, title) => {
-    const el = document.createElement('button');
-    el.innerHTML = `${label}${cost ? `<span class="cost">⭐${cost}</span>` : ''}`;
-    el.disabled = disabled; el.onclick = fn;
-    if (title) el.title = title;
-    act.appendChild(el); return el;
-  };
-  const note = text => { const n = document.createElement('div'); n.className = 'muted note'; n.textContent = text; act.appendChild(n); };
-  const pl = G.players[me];
 
-  if (b && b.kind === 'city' && b.owner === me) {
+  const addAct = o => {
+    const el = document.createElement('button');
+    el.className = 'act' + (o.locked ? ' locked' : '') + (o.cls ? ' ' + o.cls : '');
+    el.disabled = !!o.disabled;
+    el.innerHTML = `<span class="disc">${o.img ? `<img src="${o.img}" alt="">` : `<span class="glyph">${o.glyph}</span>`}${o.cost ? starCost(o.cost) : ''}${o.locked ? '<span class="lock">🔒</span>' : ''}</span><span class="lbl">${o.label}</span>`;
+    if (o.title) el.title = o.title;
+    el.onclick = o.onClick;
+    act.appendChild(el);
+  };
+
+  if (b && b.kind === 'city' && b.owner === me && !(u && u.owner !== me)) {
     const blocked = !!unitAt(x, y), full = unitCount(me) >= unitCap(me);
     for (const k of Object.keys(UNITS)) {
       const d = UNITS[k];
       if (d.train === false) continue;
-      if (!unitUnlocked(me, k)) { addBtn(`🔒 ${d.icon} ${d.name}`, 0, true, null, `Research ${TECHS[d.tech].name}`); continue; }
-      addBtn(`${d.icon} ${d.name}`, d.cost, !canTrain({ x, y }, k, me), () => {
-        if (train({ x, y }, k, me)) { const nu = unitAt(x, y); select({ kind: 'unit', id: nu.id }); }
-      }, `Attack ${d.atk} · Defence ${d.def} · Move ${d.mv} · Range ${d.range} · HP ${d.hp}`);
+      if (!unitUnlocked(me, k)) {
+        addAct({ img: unitIcon(k, pl.tribe), label: d.name, locked: true, title: `Research ${TECHS[d.tech].name}`,
+          onClick: () => toast(`Research ${TECHS[d.tech].icon} ${TECHS[d.tech].name} in the Tech Tree to train ${d.name}s.`) });
+        continue;
+      }
+      addAct({ img: unitIcon(k, pl.tribe), label: d.name, cost: d.cost, disabled: !canTrain({ x, y }, k, me),
+        title: `Attack ${d.atk} · Defence ${d.def} · Move ${d.mv} · Range ${d.range} · Health ${d.hp}`,
+        onClick: () => { if (train({ x, y }, k, me)) { const nu = unitAt(x, y); select({ kind: 'unit', id: nu.id }); } } });
     }
-    if (blocked) note('Move the unit out of the city to train here.');
-    else if (full) note(`Unit limit reached (${unitCap(me)}). Grow your cities to support more units.`);
+    if (blocked && !u) hints.push('Move the unit out of the city to train here.');
+    else if (blocked) hints.push('Move this unit out of the city to train here.');
+    else if (full) hints.push(`Unit limit reached (${unitCap(me)}). Grow your cities to support more.`);
   }
   if (tileOwner(x, y) === me && !(u && u.owner !== me)) {
+    const cl = climateOf(tl);
     for (const k of Object.keys(WORKS)) {
       const w = WORKS[k];
       if (!w.on(tl)) continue;
-      if (!hasTech(me, w.tech)) { addBtn(`🔒 ${w.icon} ${w.label}`, 0, true, null, `Research ${TECHS[w.tech].name}`); continue; }
-      addBtn(`${w.icon} ${w.label} <span class="muted">+${w.pop} pop</span>`, w.cost, pl.stars < w.cost, () => {
-        if (doWork(x, y, k, me)) { select(sel); showReward(); }
-      });
+      if (!hasTech(me, w.tech)) {
+        addAct({ img: workIcon(k, cl), label: w.label, locked: true, title: `Research ${TECHS[w.tech].name}`,
+          onClick: () => toast(`Research ${TECHS[w.tech].icon} ${TECHS[w.tech].name} in the Tech Tree first.`) });
+        continue;
+      }
+      addAct({ img: workIcon(k, cl), label: `${w.label} +${w.pop}`, cost: w.cost, disabled: pl.stars < w.cost,
+        onClick: () => { if (doWork(x, y, k, me)) { select(sel); showReward(); } } });
     }
   }
   if (u && u.owner === me) {
     if (confirmDisband === u.id) {
-      addBtn('Confirm disband', 0, false, () => { G.units = G.units.filter(z => z !== u); updateVis(); select(null); });
-      addBtn('Keep unit', 0, false, () => { confirmDisband = null; ui(); });
-    } else addBtn('Disband', 0, false, () => { confirmDisband = u.id; ui(); }, 'Remove this unit to free up space');
+      addAct({ glyph: '✔', label: 'Confirm', cls: 'danger', onClick: () => { G.units = G.units.filter(z => z !== u); updateVis(); select(null); } });
+      addAct({ glyph: '↩', label: 'Keep', onClick: () => { confirmDisband = null; ui(); } });
+    } else addAct({ glyph: '✖', label: 'Disband', title: 'Remove this unit to free up space', onClick: () => { confirmDisband = u.id; ui(); } });
   }
+  if (hints.length) $('info-text').insertAdjacentHTML('beforeend', `<span>${hints.join(' ')}</span>`);
 }
+$('btn-deselect').onclick = () => select(null);
 
+/* radial tech tree */
 function renderTech() {
-  const me = G.view, pl = G.players[me], can = canAct();
-  $('tech-stars').textContent = `⭐ ${pl.stars} to spend. Each city you own makes research a little pricier.`;
-  const keys = Object.keys(TECHS);
+  const me = G.view, pl = G.players[me];
+  $('tech-stars').innerHTML = `${STAR_SVG}${pl.stars}`;
+  const keys = Object.keys(TECHS), roots = keys.filter(k => !TECHS[k].req);
   const kids = k => keys.filter(c => TECHS[c].req === k);
-  const card = k => {
-    const t = TECHS[k], owned = hasTech(me, k), avail = techAvailable(me, k), cost = techCost(me, k);
+  const R = [0, 128, 232, 332], pos = {};
+  roots.forEach((r, i) => {
+    const a = -Math.PI / 2 + i * 2 * Math.PI / roots.length;
+    pos[r] = { a, t: 1 };
+    const k2 = kids(r);
+    k2.forEach((c, j) => {
+      const a2 = a + (k2.length > 1 ? (j - (k2.length - 1) / 2) * 0.44 : 0);
+      pos[c] = { a: a2, t: 2 };
+      kids(c).forEach(g => { pos[g] = { a: a2, t: 3 }; });
+    });
+  });
+  const xy = k => [Math.cos(pos[k].a) * R[pos[k].t], Math.sin(pos[k].a) * R[pos[k].t]];
+  // names sit on the side facing the centre, in the gap before the next node out
+  const labelY = k => { const sn = Math.sin(pos[k].a); return Math.abs(sn) < 0.35 || sn < 0 ? 52 : -46; };
+  let lines = '', nodes = '';
+  for (const k of keys) {
+    const [x, y] = xy(k), [px, py] = TECHS[k].req ? xy(TECHS[k].req) : [0, 0];
+    const owned = hasTech(me, k), avail = techAvailable(me, k), cost = techCost(me, k);
+    lines += `<line x1="${px.toFixed(1)}" y1="${py.toFixed(1)}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" class="${owned ? 'on' : ''}"/>`;
     const cls = owned ? 'owned' : avail ? (pl.stars >= cost ? 'avail' : 'avail short') : 'locked';
-    const label = owned ? '✓ Known' : avail ? `⭐ ${cost}` : `🔒 needs ${TECHS[t.req].name}`;
-    return `<button class="tech ${cls}" data-tech="${k}" style="--tier:${t.tier}" ${owned || !avail || pl.stars < cost || !can ? 'disabled' : ''}>
-      <span class="t-name">${t.icon} ${t.name}</span><span class="t-desc">${t.desc}</span><span class="t-cost">${label}</span></button>`;
-  };
-  $('tech-tree').innerHTML = keys.filter(k => !TECHS[k].req).map(r => {
-    const list = [];
-    const walk = k => { list.push(card(k)); kids(k).forEach(walk); };
-    walk(r);
-    return `<div class="branch">${list.join('')}</div>`;
-  }).join('');
+    nodes += `<g class="node ${cls}" data-tech="${k}" transform="translate(${x.toFixed(1)},${y.toFixed(1)})" tabindex="0" role="button" aria-label="${TECHS[k].name}${owned ? ', researched' : avail ? `, costs ${cost} stars` : ', locked'}">
+      <circle r="34"/><text class="ic">${TECHS[k].icon}</text><text class="nm" y="${labelY(k)}">${TECHS[k].name}</text>
+      ${owned ? '' : `<g class="price" transform="translate(27,-27)"><rect x="-18" y="-11" width="36" height="22" rx="11"/><text>${avail ? cost : '🔒'}</text></g>`}
+    </g>`;
+  }
+  const center = `<g class="center"><circle r="50" fill="${pl.color}"/><image href="${tribeIcon(pl.tribe)}" x="-46" y="-50" width="92" height="92"/></g>`;
+  $('tech-svg').innerHTML = `<g transform="translate(400,400)">${lines}${center}${nodes}</g>`;
+  if (techSel && !$('tech-pop').hidden) showTechPop(techSel);
 }
-$('tech-tree').addEventListener('click', e => {
-  const btn = e.target.closest('button[data-tech]');
-  if (!btn || !canAct()) return;
-  const k = btn.dataset.tech;
-  if (research(G.view, k)) { sfx('tech'); toast(`Discovered ${TECHS[k].icon} ${TECHS[k].name}: ${TECHS[k].desc}`); refreshSel(); ui(); }
+function showTechPop(k) {
+  techSel = k;
+  const t = TECHS[k], me = G.view, pl = G.players[me];
+  const owned = hasTech(me, k), avail = techAvailable(me, k), cost = techCost(me, k);
+  $('tp-title').textContent = `${t.icon} ${t.name}`;
+  $('tp-desc').textContent = `${t.desc}.`;
+  const cl = CLIMATES[pl.tribe];
+  $('tp-unlocks').innerHTML = [
+    ...Object.entries(UNITS).filter(([, u]) => u.tech === k).map(([uk, u]) => `<figure><img src="${unitIcon(uk, pl.tribe)}" alt=""><figcaption>${u.name}</figcaption></figure>`),
+    ...Object.entries(WORKS).filter(([, w]) => w.tech === k).map(([wk, w]) => `<figure><img src="${workIcon(wk, cl)}" alt=""><figcaption>${w.label}</figcaption></figure>`),
+  ].join('');
+  const btn = $('tp-research');
+  btn.innerHTML = owned ? 'Researched' : avail ? `Research ${STAR_SVG}${cost}` : `Needs ${TECHS[t.req].name}`;
+  btn.disabled = owned || !avail || pl.stars < cost || !canAct();
+  $('tech-pop').hidden = false;
+}
+$('tech-svg').addEventListener('click', e => {
+  const n = e.target.closest('[data-tech]');
+  if (n) { sfx('click'); showTechPop(n.dataset.tech); }
 });
+$('tech-svg').addEventListener('keydown', e => {
+  const n = e.target.closest('[data-tech]');
+  if (n && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); showTechPop(n.dataset.tech); }
+});
+$('tp-close').onclick = () => { $('tech-pop').hidden = true; techSel = null; };
+$('tp-research').onclick = () => {
+  const k = techSel;
+  if (!k || !canAct()) return;
+  if (research(G.view, k)) { sfx('tech'); toast(`Discovered ${TECHS[k].icon} ${TECHS[k].name}!`); refreshSel(); ui(); }
+};
+
+function renderGameMenu() {
+  $('gm-title').textContent = `${G.mode === 'perfection' ? `Perfection · turn ${G.turn} of ${G.turnLimit}` : `Domination · turn ${G.turn}`} · ${G.diff[0].toUpperCase() + G.diff.slice(1)}`;
+  $('gm-tribes').innerHTML = G.players.map((p, i) => ({ p, i, s: score(i) })).sort((a, b) => b.s - a.s).map(({ p, i, s }) =>
+    `<div class="trow ${p.alive ? '' : 'dead'}"><img src="${tribeIcon(p.tribe)}" alt=""><b style="color:${p.color}">${esc(p.name)}${p.ai ? '' : ' 👤'}</b><span>${cityTiles(i).length} cities</span><span>${p.techs.length} techs</span><span class="num">${s.toLocaleString('en-US')}</span></div>`).join('');
+  $('gm-sound').textContent = muted ? 'Sound: off' : 'Sound: on';
+}
 
 function showReward() {
   if (!G || G.over || !G.rewards.length || G.cur !== G.view) return;
   const r = G.rewards[0], c = { x: r.x, y: r.y, b: T(r.x, r.y).b };
   if (!c.b || c.b.kind !== 'city' || c.b.owner !== r.owner) { G.rewards.shift(); showReward(); return; }
-  $('reward-title').textContent = `${c.b.name} reached level ${r.level}!`;
+  $('reward-title').textContent = `${c.b.name} · Level ${r.level}`;
   const box = $('reward-opts');
   box.innerHTML = '';
   for (const [key, icon, name, desc] of rewardOptions(r.level)) {
@@ -965,6 +1074,7 @@ function showReward() {
 }
 function showPass() {
   const pl = G.players[G.cur];
+  $('pass-img').src = tribeIcon(pl.tribe);
   $('pass-title').textContent = `${pl.name}'s turn`;
   $('pass-title').style.color = pl.color;
   $('pass-text').textContent = `Turn ${G.turn}. Hand the device to ${pl.name} and keep the screen hidden from the others.`;
@@ -974,7 +1084,7 @@ function showPass() {
 $('btn-pass').onclick = () => {
   $('pass').hidden = true;
   focusHome(false);
-  banner(`${G.players[G.cur].name} · Turn ${G.turn}`, `+${income(G.cur)} ⭐ this turn`, G.players[G.cur].color);
+  banner(`${G.players[G.cur].name}: turn ${G.turn}`, `+${income(G.cur)} stars`);
   refreshSel(); ui(); showReward();
 };
 
@@ -1284,7 +1394,8 @@ function drawBuilding(wx, wy, b, now) {
   else if (b.kind === 'ruin') drawRuin(cx, cy, now);
   else {
     drawCity(wx, wy, b, now);
-    labels.push({ x: cx, y: cy + 15, text: `${b.capital ? '★ ' : ''}${b.name}`, level: b.level, color: G.players[b.owner].color });
+    labels.push({ x: cx, y: cy + 15, text: b.name, capital: b.capital, level: b.level, color: G.players[b.owner].color,
+      pop: b.pop, need: b.level >= MAX_LEVEL ? 0 : popNeeded(b) });
   }
 }
 
@@ -1595,11 +1706,17 @@ function drawWorld(now, demoMode) {
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   for (const l of labels) {
     ctx.font = '800 9.5px Nunito, system-ui, sans-serif';
-    const tw = ctx.measureText(l.text).width, w = tw + 22;
-    pill(l.x - w / 2, l.y - 6.5, w, 13, 'rgba(11,18,32,.84)');
-    circle(l.x + w / 2 - 7, l.y, 5.2, l.color, '#0b1220', 1);
-    ctx.fillStyle = '#fff'; ctx.fillText(l.text, l.x - 5, l.y + 0.5);
-    ctx.font = '800 8px Nunito, system-ui, sans-serif'; ctx.fillStyle = '#0b1220'; ctx.fillText(String(l.level), l.x + w / 2 - 7, l.y + 0.5);
+    const crown = l.capital ? 12 : 0, tw = ctx.measureText(l.text).width, w = tw + 22 + crown, x0 = l.x - w / 2;
+    pill(x0, l.y - 6.5, w, 13, 'rgba(11,18,32,.84)');
+    if (l.capital) poly([[x0 + 4, l.y + 3], [x0 + 4, l.y - 2.5], [x0 + 6.6, l.y], [x0 + 9, l.y - 4], [x0 + 11.4, l.y], [x0 + 14, l.y - 2.5], [x0 + 14, l.y + 3]], '#ffcf3f', '#7a5200', 0.8);
+    circle(x0 + w - 7, l.y, 5.2, l.color, '#0b1220', 1);
+    ctx.fillStyle = '#fff'; ctx.fillText(l.text, l.x - 5 + crown / 2, l.y + 0.5);
+    ctx.font = '800 8px Nunito, system-ui, sans-serif'; ctx.fillStyle = '#0b1220'; ctx.fillText(String(l.level), x0 + w - 7, l.y + 0.5);
+    if (l.need) { // population pips: progress to the next level
+      const pw = 5, gap = 1.5, tot = l.need * pw + (l.need - 1) * gap, px = l.x - tot / 2, py = l.y + 9;
+      pill(px - 2.5, py - 2, tot + 5, 7, 'rgba(11,18,32,.84)');
+      for (let i = 0; i < l.need; i++) { ctx.fillStyle = i < l.pop ? '#8fe9ff' : 'rgba(255,255,255,.25)'; ctx.fillRect(px + i * (pw + gap), py, pw, 3); }
+    }
   }
 
   // clouds over the unexplored world and a ring of them around its edge
@@ -1716,8 +1833,7 @@ cv.addEventListener('wheel', e => { e.preventDefault(); zoomAt(e.deltaY < 0 ? 1.
 addEventListener('resize', resize);
 addEventListener('keydown', e => {
   if (e.key === 'Escape') {
-    if (!$('help').hidden) { $('help').hidden = true; return; }
-    if (!$('tech').hidden) { $('tech').hidden = true; return; }
+    for (const id of ['help', 'tech-pop', 'tech', 'game-menu']) if (!$(id).hidden) { $(id).hidden = true; if (id === 'tech') $('tech-pop').hidden = true; return; }
     if (G) select(null);
     return;
   }
@@ -1730,50 +1846,113 @@ addEventListener('keydown', e => {
 
 /* ---------- menus ---------- */
 const MAX_TRIBES = { 12: 4, 16: 6, 20: 6, 24: 6 };
-let slots = [{ tribe: 0, ai: false }, { tribe: 1, ai: true }, { tribe: 2, ai: true }];
-function renderSlots() {
-  const n = +$('opt-size').value;
-  const max = MAX_TRIBES[n] || 6;
-  const want = Math.min(+$('opt-count').value, max);
-  [...$('opt-count').options].forEach(o => { o.disabled = +o.value > max; });
-  $('opt-count').value = String(want);
-  while (slots.length < want) {
-    const used = slots.map(s => s.tribe);
-    slots.push({ tribe: TRIBES.findIndex((_, i) => !used.includes(i)), ai: true });
-  }
-  slots.length = want;
-  $('slots').innerHTML = slots.map((s, i) => `
-    <div class="slot">
-      <span class="dot" style="background:${TRIBES[s.tribe].color}"></span>
-      <select id="slot-tribe-${i}" data-i="${i}" class="slot-tribe" aria-label="Tribe for player ${i + 1}">
-        ${TRIBES.map((t, k) => `<option value="${k}" ${k === s.tribe ? 'selected' : ''}>${t.name} · ${TECHS[t.tech].name}</option>`).join('')}
-      </select>
-      ${i === 0 ? '<span class="you">You</span>' : `<select id="slot-ctrl-${i}" data-i="${i}" class="slot-ctrl" aria-label="Controller for player ${i + 1}">
-        <option value="ai" ${s.ai ? 'selected' : ''}>Computer</option><option value="human" ${s.ai ? '' : 'selected'}>Human (pass &amp; play)</option></select>`}
-    </div>`).join('');
-  $('tribe-about').textContent = `${TRIBES[slots[0].tribe].name}: ${TRIBES[slots[0].tribe].about}. Starts with ${TECHS[TRIBES[slots[0].tribe].tech].name}.`;
-}
-$('slots').addEventListener('change', e => {
-  const i = +e.target.dataset.i;
-  if (e.target.classList.contains('slot-tribe')) {
-    const k = +e.target.value, other = slots.findIndex((s, j) => j !== i && s.tribe === k);
-    if (other >= 0) slots[other].tribe = slots[i].tribe; // swap so every tribe stays unique
-    slots[i].tribe = k;
-  } else slots[i].ai = e.target.value === 'ai';
-  renderSlots();
-});
-$('opt-size').onchange = renderSlots;
-$('opt-count').onchange = renderSlots;
+const setup = { tribe: 0, opp: 2, mode: 'domination', diff: 'normal', n: 16, map: 'continents', mp: false,
+  slots: [{ tribe: 0, ai: false }, { tribe: 1, ai: false }] };
 
-let bannerTimer = 0;
-function banner(title, sub, color) {
-  const el = $('banner');
-  $('banner-title').textContent = title; $('banner-title').style.color = color || '';
-  $('banner-sub').textContent = sub || '';
-  el.hidden = false; el.classList.remove('go'); void el.offsetWidth; el.classList.add('go');
-  clearTimeout(bannerTimer); bannerTimer = setTimeout(() => { el.hidden = true; }, 2000);
+function showScreen(name) {
+  for (const s of ['home', 'tribe', 'settings']) $('scr-' + s).hidden = s !== name;
+  if (name === 'home') refreshMenu();
+  if (name === 'tribe') renderTribes();
+  if (name === 'settings') renderSettings();
 }
-function showGame(show) { $('hud').hidden = !show; $('panel').hidden = !show; $('menu').hidden = show; }
+function renderTribes() {
+  $('tribe-grid').innerHTML = TRIBES.map((t, i) => `
+    <button class="tribe-card" data-tribe="${i}" style="--c:${t.color}">
+      <img src="${tribeIcon(i)}" alt="">
+      <b>${t.name}</b>
+      <span class="muted">${t.about}</span>
+      <span class="tech">Starts with ${TECHS[t.tech].icon} ${TECHS[t.tech].name}</span>
+    </button>`).join('');
+}
+$('tribe-grid').addEventListener('click', e => {
+  const c = e.target.closest('[data-tribe]');
+  if (!c) return;
+  sfx('click');
+  setup.tribe = +c.dataset.tribe;
+  showScreen('settings');
+});
+
+function renderSettings() {
+  const max = MAX_TRIBES[setup.n] || 6;
+  setup.opp = Math.min(setup.opp, max - 1);
+  if (setup.slots.length > max) setup.slots.length = max;
+  const seg = (key, opts) => `<div class="seg" data-key="${key}">${opts.map(([v, l, dis]) =>
+    `<button type="button" data-v="${v}" class="${String(setup[key]) === String(v) ? 'on' : ''}" ${dis ? 'disabled' : ''}>${l}</button>`).join('')}</div>`;
+  let html = '';
+  if (setup.mp) {
+    html += `<div><span class="set-label">Players</span><div id="slots">${setup.slots.map((s, i) => `
+      <div class="slot">
+        <img src="${tribeIcon(s.tribe)}" alt="">
+        <select data-i="${i}" aria-label="Tribe for player ${i + 1}">${TRIBES.map((t, k) => `<option value="${k}" ${k === s.tribe ? 'selected' : ''}>${t.name}</option>`).join('')}</select>
+        <button type="button" class="ctl ${s.ai ? '' : 'human'}" data-i="${i}" ${i === 0 ? 'disabled' : ''}>${s.ai ? 'Computer' : 'Human'}</button>
+      </div>`).join('')}</div>
+      <div class="slot-btns"><button type="button" class="btn dark" id="slot-add" ${setup.slots.length >= max ? 'disabled' : ''}>Add player</button>
+      <button type="button" class="btn dark" id="slot-remove" ${setup.slots.length <= 2 ? 'disabled' : ''}>Remove player</button></div></div>`;
+  } else {
+    html += `<div><span class="set-label">Opponents</span>${seg('opp', [1, 2, 3, 4, 5].map(v => [v, v, v > max - 1]))}</div>`;
+  }
+  html += `<div><span class="set-label">Game mode</span><div class="mode-cards seg" data-key="mode">
+      <button type="button" data-v="domination" class="${setup.mode === 'domination' ? 'on' : ''}"><b>Domination</b><span>Play until only one tribe is left.</span></button>
+      <button type="button" data-v="perfection" class="${setup.mode === 'perfection' ? 'on' : ''}"><b>Perfection</b><span>Get the highest score in 30 turns.</span></button>
+    </div></div>
+    <div><span class="set-label">Difficulty</span>${seg('diff', [['easy', 'Easy'], ['normal', 'Normal'], ['hard', 'Hard'], ['crazy', 'Crazy']])}</div>
+    <div><span class="set-label">Map size</span>${seg('n', [[12, 'Small'], [16, 'Medium'], [20, 'Large'], [24, 'Huge']])}</div>
+    <div><span class="set-label">Map type</span>${seg('map', [['continents', 'Continents'], ['pangea', 'Pangea'], ['archipelago', 'Archipelago']])}</div>`;
+  $('settings-title').textContent = setup.mp ? 'Pass & Play' : `${TRIBES[setup.tribe].name} · Game settings`;
+  $('settings').innerHTML = html;
+}
+$('settings').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b || b.disabled) return;
+  const segEl = b.closest('.seg');
+  if (segEl && b.dataset.v !== undefined) {
+    const key = segEl.dataset.key;
+    setup[key] = key === 'n' || key === 'opp' ? +b.dataset.v : b.dataset.v;
+  } else if (b.classList.contains('ctl')) {
+    const s = setup.slots[+b.dataset.i];
+    s.ai = !s.ai;
+  } else if (b.id === 'slot-add') {
+    const used = setup.slots.map(s => s.tribe);
+    setup.slots.push({ tribe: TRIBES.findIndex((_, i) => !used.includes(i)), ai: false });
+  } else if (b.id === 'slot-remove') setup.slots.pop();
+  sfx('click');
+  renderSettings();
+});
+$('settings').addEventListener('change', e => {
+  if (e.target.tagName !== 'SELECT') return;
+  const i = +e.target.dataset.i, k = +e.target.value;
+  const other = setup.slots.findIndex((s, j) => j !== i && s.tribe === k);
+  if (other >= 0) setup.slots[other].tribe = setup.slots[i].tribe; // swap so every tribe stays unique
+  setup.slots[i].tribe = k;
+  renderSettings();
+});
+
+function startGame(cfg) {
+  const s = newGame(cfg);
+  G = s; startTurn(0);
+  begin(s, false);
+  save();
+}
+$('btn-start').onclick = () => {
+  let slots;
+  if (setup.mp) slots = setup.slots.map(s => ({ ...s }));
+  else {
+    const others = TRIBES.map((_, i) => i).filter(i => i !== setup.tribe).sort(() => Math.random() - 0.5).slice(0, setup.opp);
+    slots = [{ tribe: setup.tribe, ai: false }, ...others.map(t => ({ tribe: t, ai: true }))];
+  }
+  sfx('click');
+  startGame({ slots, n: setup.n, mapType: setup.map, mode: setup.mode, diff: setup.diff, seed: (Math.random() * 2 ** 31) | 0 });
+};
+
+// Short notices at the top of the screen, such as the start of a turn.
+function banner(title, sub) { toast(sub ? `${title} · ${sub}` : title); }
+function showGame(show) {
+  gameShown = show;
+  $('hud').hidden = !show; $('menu').hidden = show;
+  $('game-menu').hidden = true;
+  if (show) ui();
+  else { $('bottom').hidden = true; $('sheet').hidden = true; $('turn-of').hidden = true; showScreen('home'); }
+}
 function focusHome(instant) {
   const c = cityTiles(G.view)[0] || G.units.find(u => u.owner === G.view);
   if (!c) return;
@@ -1789,59 +1968,63 @@ function begin(state, resumed) {
       T(x, y).c = near ? G.players[near.b.owner].tribe : 0;
     }
   }
-  ['gameover', 'reward', 'pass', 'tech', 'help'].forEach(id => { $(id).hidden = true; });
+  ['gameover', 'reward', 'pass', 'tech', 'tech-pop', 'help', 'game-menu'].forEach(id => { $(id).hidden = true; });
   if (G.players[G.cur].ai) { // restored mid-way through the computer's turn
-    updateVis(); focusHome(true); cam.z = W < 700 ? 0.8 : 1.05; showGame(true); ui();
+    updateVis(); focusHome(true); cam.z = W < 700 ? 0.8 : 1.05; showGame(true);
     runTurns(true);
     return;
   }
   G.view = G.cur;
-  updateVis(); focusHome(true); showGame(true); ui();
+  updateVis(); focusHome(true); showGame(true);
   const z = W < 700 ? 0.8 : 1.05;
   cam.z = z * 0.55; camGoal = { x: cam.x, y: cam.y, z };
   if (humanCount() > 1) showPass();
   else {
-    banner(G.turn === 1 && !resumed ? G.players[G.cur].name : `Turn ${G.turn}`, G.turn === 1 && !resumed ? TRIBES[G.players[G.cur].tribe].about : 'Welcome back', G.players[G.cur].color);
+    banner(G.turn === 1 && !resumed ? `${G.players[G.cur].name}: ${TRIBES[G.players[G.cur].tribe].about}` : `Turn ${G.turn}`, G.turn === 1 && !resumed ? '' : 'Welcome back');
     showReward();
   }
 }
-$('btn-new').onclick = () => {
-  const cfg = {
-    slots: slots.map(s => ({ ...s })), n: +$('opt-size').value, mapType: $('opt-map').value,
-    mode: $('opt-mode').value, diff: $('opt-diff').value, seed: (Math.random() * 2 ** 31) | 0,
-  };
-  const s = newGame(cfg);
-  G = s; startTurn(0);
-  begin(s, false);
-  save();
-};
+
+$('btn-new').onclick = () => { setup.mp = false; sfx('click'); showScreen('tribe'); };
+$('btn-mp').onclick = () => { setup.mp = true; sfx('click'); showScreen('settings'); };
+$('btn-tribe-back').onclick = () => showScreen('home');
+$('btn-settings-back').onclick = () => showScreen(setup.mp ? 'home' : 'tribe');
 $('btn-continue').onclick = () => { const s = loadSave(); if (s) begin(s, true); };
 $('btn-resume').onclick = () => showGame(true);
-$('btn-menu').onclick = () => { $('menu').hidden = false; refreshMenu(); };
-$('btn-end').onclick = endTurn;
-$('btn-next').onclick = nextUnit;
-function toggleTech() { if (!G || G.over) return; $('tech').hidden = !$('tech').hidden; if (!$('tech').hidden) renderTech(); }
-$('btn-tech').onclick = toggleTech;
-$('btn-tech-close').onclick = () => { $('tech').hidden = true; };
-$('btn-sound').onclick = () => {
+$('btn-howto').onclick = () => { $('help').hidden = false; };
+$('btn-game').onclick = () => { if (!G) return; sfx('click'); renderGameMenu(); $('game-menu').hidden = false; };
+$('gm-resume').onclick = () => { $('game-menu').hidden = true; };
+$('gm-sound').onclick = () => {
   muted = !muted;
   try { localStorage.setItem('polyweb-muted', muted ? '1' : '0'); } catch (e) { /* ignore */ }
   if (!muted) sfx('click');
-  ui();
+  renderGameMenu();
 };
-const openHelp = () => { $('help').hidden = false; };
-$('btn-help').onclick = openHelp;
-$('link-help').onclick = e => { e.preventDefault(); openHelp(); };
+$('gm-help').onclick = () => { $('help').hidden = false; };
+$('gm-main').onclick = () => { save(); showGame(false); };
+$('btn-end').onclick = endTurn;
+function toggleTech() {
+  if (!G || G.over || !gameShown) return;
+  $('tech').hidden = !$('tech').hidden;
+  $('tech-pop').hidden = true; techSel = null;
+  if (!$('tech').hidden) {
+    sfx('click'); renderTech();
+    const sc = $('tech-scroll');
+    sc.scrollLeft = (sc.scrollWidth - sc.clientWidth) / 2; sc.scrollTop = (sc.scrollHeight - sc.clientHeight) / 2;
+  }
+}
+$('btn-tech').onclick = toggleTech;
+$('btn-tech-close').onclick = () => { $('tech').hidden = true; $('tech-pop').hidden = true; };
 $('btn-help-close').onclick = () => { $('help').hidden = true; };
-$('btn-again').onclick = () => { $('gameover').hidden = true; showGame(false); refreshMenu(); };
+$('btn-again').onclick = () => { $('gameover').hidden = true; showGame(false); };
 $('btn-view').onclick = () => { $('gameover').hidden = true; };
 function refreshMenu() {
-  $('btn-continue').hidden = !loadSave();
+  $('btn-continue').hidden = !loadSave() || !!(G && !G.over);
   $('btn-resume').hidden = !(G && !G.over);
 }
 
 /* ---------- boot ---------- */
-resize(); renderSlots(); refreshMenu(); requestAnimationFrame(draw);
+resize(); showScreen('home'); requestAnimationFrame(draw);
 // Keep a game in progress when this page is hot-reloaded inside an artifact viewer.
 window.claude?.hot?.snapshot?.(() => (G && !G.over ? { G } : {}));
 function start(data) { if (data && data.G && data.G.v === 2) begin(data.G, true); }
