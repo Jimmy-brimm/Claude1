@@ -102,6 +102,11 @@ kbd{background:#0006;border:1px solid var(--line);border-radius:4px;padding:0 5p
 #info-title .dot{width:14px;height:14px;border-radius:50%;box-shadow:0 0 0 2px #0b1220;flex:none}
 #info-title .crown{width:20px;height:20px;fill:var(--gold);stroke:#7a5200;stroke-width:1.2}
 #info-text{color:var(--muted);margin-top:3px;display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center}
+#info-text .skills{display:flex;flex-wrap:wrap;gap:4px}
+#info-text .skills span{font:700 11px var(--font-body);text-transform:uppercase;letter-spacing:.5px;color:#cfe3ff;background:rgba(74,140,255,.22);border:1px solid rgba(120,170,255,.4);border-radius:999px;padding:2px 8px;cursor:help}
+.act.go .disc{background:radial-gradient(circle at 50% 35%,#c8ffd8,#4fcf7a);box-shadow:0 4px 0 #2a8a48,0 6px 14px rgba(0,0,0,.35);animation:goPulse 1.6s ease-in-out infinite}
+@keyframes goPulse{50%{transform:scale(1.06)}}
+@media (prefers-reduced-motion:reduce){.act.go .disc{animation:none}}
 #info .x{top:8px;right:8px;width:32px;height:32px}
 .chips{display:flex;gap:6px;flex-wrap:wrap}
 .chips span{display:inline-flex;align-items:center;gap:4px;background:rgba(255,255,255,.08);border-radius:999px;padding:2px 9px 2px 6px;color:var(--text);font-weight:800;font-variant-numeric:tabular-nums}

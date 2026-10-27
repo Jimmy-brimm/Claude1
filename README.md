@@ -16,14 +16,28 @@ It has original art and code and is not affiliated with Midjiwan. There is no bu
 - **Game modes:** Domination (last tribe standing) and Perfection (highest score after 30 turns).
 - **Difficulty:** Easy, Normal, Hard, Crazy (computer income bonus).
 - **Pass and play:** set any extra player to Human to play hot-seat on one device, with a hand-over screen between turns.
-- **Tech tree** of 15 technologies in five branches: Riding, Organization, Climbing, Fishing, Hunting.
-- **Units:** Warrior, Rider, Archer, Defender, Swordsman, Knight, Catapult and the Giant super unit. Units board boats on shallow water (Sailing) and become ships that cross the ocean (Navigation).
-- **Cities** grow by harvesting fruit, animals and fish or building farms, mines, lumber huts and ports. Every level offers a reward choice: workshop or explorer, walls or resources, population or border growth, park or Giant.
-- **Ruins** hold treasure, free technology, maps or a veteran swordsman.
-- **Combat** uses attack/defence/health with city, wall, forest and mountain bonuses. Melee winners advance, idle units heal, and three kills make a veteran.
+- **Tech tree** of 25 technologies in five branches of five, laid out like Polytopia's: Riding → Roads → Trade and Free Spirit → Chivalry; Organization → Farming → Construction and Strategy → Diplomacy; Climbing → Mining → Smithery and Meditation → Philosophy; Fishing → Sailing → Navigation and Whaling → Aquatism; Hunting → Archery → Spiritualism and Forestry → Mathematics.
+- **Units with skills:** Warrior, Rider, Archer, Defender, Swordsman, Mind Bender, Catapult, Knight and the Giant. Skills include *dash* (attack after moving), *escape* (move after attacking), *persist* (attack again after a kill), *fortify* (city defence bonus), *heal* and *convert*.
+- **Boats:** units board at their own ports and become Boats, upgradeable at sea to Ships (Sailing) and Battleships (Navigation).
+- **Cities** grow from harvests and buildings in their borders: fruit, game, fish, whales, farms, lumber huts, mines and ports, plus windmills, sawmills and forges (which grow with neighbouring industry), markets and four kinds of temple. Every level offers a reward choice: workshop or explorer, walls or resources, population or border growth, park or Giant.
+- **Ruins** hold stars, free technology, an explorer, a veteran swordsman or new citizens.
 - **Look and feel:** low-poly isometric art drawn in code. Each tribe's homeland has its own climate (meadow, autumn woods, jungle, desert, highland, tundra) with matching trees, rock, fruit and wildlife (deer, boar, tapir, camel, goat, reindeer). Land sits on earthen slabs; the sea blends from turquoise shallows to deep blue, with surf and glints. Every tribe has its own headgear and its own architecture (yurts, timber houses, stilt huts, adobe, stone keeps, igloos) that grows with city level. Objects cast soft shadows, clouds part as you explore, and snow, leaves, fireflies and butterflies drift over their regions. The main menu shows a living world map.
-- **Fog of war**, unit limits per city, computer opponents that research, build, expand and use boats.
+- **Fog of war**, computer opponents that research, build, expand and use boats.
 - **Autosave** to the browser after every turn, sound effects with a mute toggle, mouse and touch controls.
+
+## Rules
+
+The rules follow *The Battle of Polytopia* as closely as possible:
+
+- **Turns.** Each unit gets one move and one attack per turn, in that order, unless a skill changes it. New units wait a turn.
+- **Capturing.** A unit that *starts* its turn on a village or enemy city can Capture it, which uses its whole turn. Ruins are examined straight away.
+- **Movement.** Forests and mountains end a move, and so does stepping next to an enemy (zone of control). Roads halve the cost between road and city tiles. Units board boats only from their own ports. Ocean needs Sailing; mountains need Climbing.
+- **Combat.** Attack force = attack × health ratio; defence force = defence × health ratio × bonus; damage = round(attack share × attack × 4.5), and the defender strikes back if it survives and is in range. Bonuses: ×1.5 in cities (fortify units), forests (Archery), mountains (Climbing) and water (Aquatism), ×4 behind city walls. Melee winners advance.
+- **Healing.** A unit that has not moved or attacked can Recover: +4 health in your borders, +2 outside. Mind Benders heal neighbours. Three kills let a unit Promote to veteran (+5 max health, fully healed).
+- **Economy.** Income is the sum of city levels, +1 for the capital, plus workshops, parks, markets and Diplomacy. Tech costs tier × number of cities + 4 (a third less with Philosophy). A city supports one unit per level, plus one; disbanding with Free Spirit refunds half.
+- **Score.** Points for territory, city levels, technology, units, parks and exploration, as in Perfection mode.
+
+Where Polytopia's exact numbers are uncertain, the closest reasonable value is used; for example, Diplomacy gives +1 star per tribe met.
 
 ## Interface
 
