@@ -136,6 +136,7 @@
       <button class="btn blue" id="gm-sound">Sound: on</button>
       <button class="btn blue" id="gm-fx">Shaders: on</button>
       <button class="btn blue" id="gm-invite" hidden>Invite players</button>
+      <button class="btn blue" id="gm-seat" hidden>Play on another device</button>
       <button class="btn blue" id="gm-help">How to Play</button>
       <button class="btn dark" id="gm-main">Main Menu</button>
     </div>
@@ -153,8 +154,8 @@
 </div>
 <div id="net-share" class="overlay" hidden>
   <div class="popup">
-    <h2>Invite your friends</h2>
-    <p class="muted">Send them this code or link. They open the game, choose Online Play and join. Each player is told when it's their turn.</p>
+    <h2 id="share-title">Invite your friends</h2>
+    <p class="muted" id="share-text"></p>
     <div id="share-code" class="share-code"></div>
     <input id="share-link" readonly aria-label="Invite link">
     <div class="row center"><button class="btn blue" id="btn-share-copy">Copy invite link</button><button class="btn green" id="btn-share-close">Play</button></div>
@@ -195,7 +196,7 @@
       <li><b>Roads</b> can be built on any land in your territory, with or without a unit there, and on unclaimed land where your unit stands. When roads join two of your cities, even through other cities, both gain a citizen, once for each pair.</li>
       <li><b>Alliances.</b> Open the Game menu and press <i>Ally?</i> beside a tribe you have met. Computer tribes answer at once; human players answer on their turn. Allies can't attack each other or take each other's cities, don't block each other's movement, share vision and each earn +1 ⭐ a turn. If every tribe left is allied, they share the victory. Breaking an alliance makes the other tribe distrust you for 10 turns.</li>
       <li><b>Lighthouses</b> stand in the four corners of the world. The first time you sight each one you earn 3 ⭐ and 100 points.</li>
-      <li><b>Online Play</b> lets friends on different devices share a game turn by turn. Create a game, send the code or invite link, and each player is told when it's their turn.</li>
+      <li><b>Online Play</b> lets friends on different devices share a game turn by turn. Create a game, send the code or invite link, and each player is told when it's their turn. Games are saved on the server, unfinished turns on your device, and <i>Play on another device</i> in the Game menu moves your seat to a phone or another browser.</li>
       <li><b>Saving.</b> There are three save slots. Pick one when you start a game; it saves after every turn. Load or delete games under Saved Games.</li>
       <li><b>Controls.</b> Drag to pan, scroll or pinch to zoom. <kbd>E</kbd> end turn, <kbd>N</kbd> next unit, <kbd>T</kbd> tech tree, <kbd>Esc</kbd> close or deselect. Shaders can be switched off in the Game menu.</li>
     </ul>

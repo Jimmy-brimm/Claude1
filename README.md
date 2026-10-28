@@ -26,7 +26,7 @@ It has original art and code and is not affiliated with Midjiwan. There is no bu
 - **Ruins** hold stars, free technology, an explorer, a veteran swordsman or new citizens.
 - **Look and feel:** low-poly isometric art drawn in code. Each tribe's homeland has its own climate (meadow, autumn woods, jungle, desert, highland, tundra) with matching trees, rock, fruit and wildlife (deer, boar, tapir, camel, goat, reindeer). Land sits on earthen slabs; the sea blends from turquoise shallows to deep blue, with surf and glints. Every tribe has its own headgear and its own architecture (yurts, timber houses, stilt huts, adobe, stone keeps, igloos) that grows with city level. Objects cast soft shadows, clouds part as you explore, and snow, leaves, petals, embers, fireflies, sparkles and butterflies drift over their regions. Units walk their path tile by tile, and zoom glides. The main menu shows a living world map.
 - **Shaders:** a WebGL pass adds bloom, colour grading, drifting cloud shadows and a vignette. It falls back to plain canvas when WebGL is missing, switches itself off if frames get slow, and has an on/off toggle in the Game menu.
-- **Fog of war**, computer opponents that research, build, expand and use boats.
+- **Fog of war**: units see two tiles (four from a mountain) and cities see well past their borders; computer opponents that research, build, expand and use boats.
 - **Three save slots**, chosen when a game starts and saved after every turn. Saved Games loads or deletes them.
 - **Autosave** to the browser after every turn, sound effects with a mute toggle, mouse and touch controls.
 
@@ -65,12 +65,14 @@ Free Supabase projects pause after a stretch without use; resume yours from the 
 
 - **Create:** Main menu → Online Play → enter your name → Create Game. Set each other seat to Online or Computer, pick tribes and settings, then share the code or invite link that appears.
 - **Join:** open the invite link, or go to Online Play and type the code, then pick a free seat.
-- **Your games:** Online Play lists every game this device has a seat in, with whose turn it is.
+- **Your games:** Online Play lists every game this device has a seat in, with whose turn it is. The home screen shows how many are waiting for you, and Saved Games links to them.
+- **Come back whenever:** finished turns are saved on the server. A half-played turn is kept on the device after every action and restored when you reopen the game, even after closing the page.
+- **Another device:** Game menu → *Play on another device* gives a private link that brings your seat to a phone, tablet or other browser. It also recovers the game if this browser forgets it. Anyone with that link can play as you.
 - If your connection drops while you end a turn, the turn is kept on the device and sent again automatically.
 
 ### Limits
 
-- Each device proves its seat with a secret key kept in that browser. Clearing site data loses the seat.
+- Each device proves its seat with a secret key kept in that browser. Clearing site data loses the seat unless you saved its *Play on another device* link.
 - The server checks whose turn it is and refuses stale or out-of-turn uploads. It does not re-check the rules, and every player downloads the whole map, including areas hidden by fog. This is fine for games among friends, but not for public matchmaking.
 - There is no resign button or turn timer yet. Finished games stay in the database until you delete them.
 

@@ -177,7 +177,7 @@ body.net-busy,body.net-busy *{cursor:progress !important}
 @media (max-width:640px){
   .online-actions{grid-template-columns:1fr}
   .save-card,.online-card{grid-template-columns:52px 1fr}
-  .save-card.online-card{grid-template-columns:1fr}
+  .save-card.online-card,.save-card.online-link{grid-template-columns:1fr}
   .online-card .save-text{grid-column:1 / -1}
   .save-card img{width:52px;height:52px}
   .save-btns{grid-column:1 / -1;grid-template-columns:1fr 1fr}
@@ -186,6 +186,7 @@ body.net-busy,body.net-busy *{cursor:progress !important}
 .save-card{display:grid;grid-template-columns:64px 1fr auto;align-items:center;gap:12px;background:var(--panel);border-radius:18px;padding:12px 14px;
   border-left:6px solid var(--c,#2a4269);box-shadow:0 6px 18px rgba(0,0,0,.35)}
 .save-card img{width:64px;height:64px}
+.save-card.online-link{grid-template-columns:1fr auto;--c:var(--blue)}
 .save-card.empty{grid-template-columns:1fr auto;opacity:.6;padding:16px 18px}
 .save-text{display:grid;gap:2px;min-width:0}
 .save-text b{font:400 20px var(--font-display);letter-spacing:.4px}

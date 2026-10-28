@@ -601,7 +601,7 @@ function explorerWalk(p, x, y, steps) { // a scout wanders off and maps what it 
     if (!opts.length) break;
     const unseen = opts.filter(([a, b]) => !G.vis[p][b][a]);
     [cx, cy] = (unseen.length ? unseen : opts)[randInt((unseen.length ? unseen : opts).length)];
-    reveal(p, cx, cy, 1);
+    reveal(p, cx, cy, 2);
   }
 }
 function ruinReward(u, x, y) {
@@ -803,7 +803,7 @@ function addPop(c, amount, p) {
 }
 function rewardOptions(level) {
   if (level === 2) return [['workshop', '🔨', 'Workshop', '+1 ⭐ every turn'], ['explorer', '🧭', 'Explorer', 'A scout maps the lands around the city'], ['militia', '⚔️', 'Militia', 'A free Warrior joins you in this city']];
-  if (level === 3) return [['wall', '🧱', 'City wall', 'Fortified units in the city defend at ×4'], ['resources', '💰', 'Resources', '+5 ⭐ right now'], ['tower', '🗼', 'Watchtower', 'The city sees two tiles further']];
+  if (level === 3) return [['wall', '🧱', 'City wall', 'Fortified units in the city defend at ×4'], ['resources', '💰', 'Resources', '+5 ⭐ right now'], ['tower', '🗼', 'Watchtower', 'The city sees four tiles further']];
   if (level === 4) return [['popgrowth', '👥', 'Population growth', '+3 population'], ['border', '🗺️', 'Border growth', 'City borders grow by one ring'], ['barracks', '🎖️', 'Barracks', 'Units trained here start as veterans']];
   return [['park', '🌳', 'Park', '+1 ⭐ every turn and 250 points'], ['giant', '🗿', 'Super unit', 'A Giant joins you in this city'], ['academy', '🎓', 'Academy', 'Every technology costs 1 ⭐ less']];
 }
@@ -923,14 +923,14 @@ function reveal(p, cx, cy, r) {
     V[y][x] = 1;
   }
 }
-function updateVis() { // units see one tile around them (two from a mountain); cities see past their borders
+function updateVis() { // units see two tiles around them (four from a mountain); cities see well past their borders
   const cities = cityTiles();
   G.players.forEach((pl, p) => {
     const V = G.vis[p];
     for (const row of V) for (let x = 0; x < row.length; x++) if (row[x] === 2) row[x] = 1;
     if (!pl.alive) return;
-    for (const u of G.units) if (allied(u.owner, p)) markVis(V, u.x, u.y, T(u.x, u.y).t === 'mountain' ? 2 : 1, p); // allies share sight
-    for (const c of cities) if (allied(c.b.owner, p)) markVis(V, c.x, c.y, radiusOf(c.b) + 1 + (c.b.tower ? 2 : 0), p);
+    for (const u of G.units) if (allied(u.owner, p)) markVis(V, u.x, u.y, T(u.x, u.y).t === 'mountain' ? 4 : 2, p); // allies share sight; sight ranges are doubled
+    for (const c of cities) if (allied(c.b.owner, p)) markVis(V, c.x, c.y, 2 * (radiusOf(c.b) + 1) + (c.b.tower ? 4 : 0), p);
   });
   checkLighthouses();
 }
@@ -1359,6 +1359,7 @@ function ui() {
     t.hidden = false;
   } else t.hidden = true;
   const ok = canAct();
+  if (net && ok) saveDraftSoon();
   $('btn-end').disabled = !ok;
   $('btn-end').classList.toggle('ready', ok && !G.units.some(u => u.owner === me && (reach(u).length || targetsFor(u, true).length)));
   $('btn-tech').disabled = !!G.over;
@@ -1578,6 +1579,7 @@ function renderGameMenu() {
   $('gm-fx').disabled = !postfx.available;
   $('gm-title').textContent += net ? ` · Online game ${net.id}` : ` · Saved in slot ${G.slot || 1}`;
   $('gm-invite').hidden = !net;
+  $('gm-seat').hidden = !net;
 }
 
 function showReward() {
@@ -4270,7 +4272,8 @@ $('btn-saves').onclick = () => { sfx('click'); showScreen('saves'); };
 $('btn-saves-back').onclick = () => showScreen('home');
 let confirmDelete = 0;
 function renderSaves() {
-  $('save-list').innerHTML = [1, 2, 3].map(i => {
+  const online = netGames().length;
+  $('save-list').innerHTML = (online ? `<div class="save-card online-link"><div class="save-text"><b>Online games</b><span>${online} game${online === 1 ? '' : 's'} saved on the server, ready whenever you are</span></div><div class="save-btns"><button class="btn blue" data-online="1">Open</button></div></div>` : '') + [1, 2, 3].map(i => {
     const g = loadSlot(i);
     if (!g) return `<div class="save-card empty"><b>Slot ${i}</b><span class="muted">Empty</span></div>`;
     const me = g.players.find(p => !p.ai) || g.players[0], when = g.savedAt ? new Date(g.savedAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '';
@@ -4286,6 +4289,7 @@ $('save-list').addEventListener('click', e => {
   const b = e.target.closest('button');
   if (!b) return;
   sfx('click');
+  if (b.dataset.online) { showScreen('online'); return; }
   if (b.dataset.load) {
     const i = +b.dataset.load, g = loadSlot(i);
     confirmDelete = 0;
@@ -4358,8 +4362,14 @@ function refreshMenu() {
   const last = loadSave(), playing = !!(G && !G.over);
   $('btn-continue').hidden = !last || playing;
   if (last) $('btn-continue').textContent = `Continue · Slot ${last.slot}, turn ${last.turn}`;
-  $('btn-saves').hidden = ![1, 2, 3].some(loadSlot);
+  $('btn-saves').hidden = ![1, 2, 3].some(loadSlot) && !netGames().length;
   $('btn-resume').hidden = !(G && !G.over);
+  $('btn-online').textContent = 'Online Play';
+  const mine = netGames();
+  if (netReady() && mine.length) rpc('game_summaries', { p_ids: mine.map(e => e.id) }).then(rows => { // how many games wait for us
+    const n = rows.filter(r => r.status !== 'over' && mine.some(e => e.id === r.id && e.seat === r.cur)).length;
+    $('btn-online').textContent = n ? `Online Play · ${n} waiting for you` : 'Online Play';
+  }).catch(() => {});
 }
 
 /* ---------- online play ---------- */
@@ -4378,10 +4388,11 @@ const store = {
 };
 const netGames = () => store.get(NET_GAMES, []);
 function netRemember(entry) { store.set(NET_GAMES, [entry, ...netGames().filter(e => e.id !== entry.id)].slice(0, 30)); }
-function netForget(id) { store.set(NET_GAMES, netGames().filter(e => e.id !== id)); store.del('polyweb-pending-' + id); }
+function netForget(id) { store.set(NET_GAMES, netGames().filter(e => e.id !== id)); store.del('polyweb-pending-' + id); store.del('polyweb-draft-' + id); }
 function randomKey() { const a = new Uint8Array(16); crypto.getRandomValues(a); return [...a].map(b => b.toString(16).padStart(2, '0')).join(''); }
 function randomCode() { const a = new Uint8Array(6); crypto.getRandomValues(a); return [...a].map(b => CODE_CHARS[b % CODE_CHARS.length]).join(''); }
 const inviteLink = id => `${location.origin}${location.pathname}?join=${id}`;
+const seatLink = () => `${location.origin}${location.pathname}?seat=${net.id}.${net.seat}.${net.key}`;
 const seatName = (seats, i) => (seats && seats[i] && seats[i].name) || TRIBES[(seats && seats[i] ? seats[i].tribe : 0)].name;
 async function rpc(fn, args) {
   const headers = { apikey: NET.anonKey, 'Content-Type': 'application/json' };
@@ -4392,7 +4403,15 @@ async function rpc(fn, args) {
   if (!res.ok) { const err = new Error((body && (body.message || body.error || body.hint)) || `Server error ${res.status}`); err.server = true; throw err; }
   return body;
 }
-function netLeave() { net = null; clearTimeout(netTimer); document.title = 'Polyweb'; }
+function netLeave() { saveDraftNow(); net = null; clearTimeout(netTimer); clearTimeout(draftTimer); document.title = 'Polyweb'; }
+// While it is our turn, the turn so far is kept on this device, so closing the page loses nothing.
+let draftTimer = 0;
+function saveDraftNow() {
+  if (net && G && !G.over && G.cur === net.seat && !busy) store.set('polyweb-draft-' + net.id, { version: net.version, state: G, at: Date.now() });
+}
+function saveDraftSoon() { clearTimeout(draftTimer); draftTimer = setTimeout(saveDraftNow, 700); }
+addEventListener('pagehide', saveDraftNow);
+document.addEventListener('visibilitychange', () => { if (document.hidden) saveDraftNow(); });
 
 // Creating, joining and opening games
 async function netCreate(cfg, name) {
@@ -4424,12 +4443,18 @@ async function netOpen(id) {
   if (!g) throw new Error('That game no longer exists.');
   netLeave();
   net = { id, seat: mine.seat, key: mine.key, version: g.version, seats: g.seats };
-  let state = g.state;
-  const pending = store.get('polyweb-pending-' + id, null); // a turn that never reached the server
+  let state = g.state, restored = false;
+  const pending = store.get('polyweb-pending-' + id, null); // a finished turn that never reached the server
+  const draft = store.get('polyweb-draft-' + id, null);     // a turn left half-played on this device
   if (pending && pending.version === g.version && g.cur === mine.seat) state = pending.state;
-  else store.del('polyweb-pending-' + id);
+  else {
+    store.del('polyweb-pending-' + id);
+    if (draft && draft.version === g.version && g.cur === mine.seat && draft.state.cur === mine.seat) { state = draft.state; restored = true; }
+    else store.del('polyweb-draft-' + id);
+  }
   begin(state, true);
   if (state === (pending && pending.state)) netSubmit();
+  else if (restored) toast('Welcome back! Your unfinished turn was restored.');
 }
 
 // Sending turns
@@ -4440,7 +4465,7 @@ async function netSend() {
   store.set('polyweb-pending-' + id, { version, state });
   try {
     const nv = await rpc('submit_turn', { p_id: id, p_version: version, p_key: net.key, p_state: state });
-    store.del('polyweb-pending-' + id);
+    store.del('polyweb-pending-' + id); store.del('polyweb-draft-' + id);
     if (net && net.id === id) net.version = nv;
   } catch (e) {
     if (!net || net.id !== id) return;
@@ -4586,18 +4611,24 @@ $('seat-list').addEventListener('click', e => {
 });
 $('btn-seat-cancel').onclick = () => { $('seat-pick').hidden = true; };
 $('btn-share-copy').onclick = async () => {
-  const link = inviteLink(net ? net.id : '');
+  const link = $('share-link').value;
   try { await navigator.clipboard.writeText(link); $('btn-share-copy').textContent = 'Copied!'; }
   catch (e) { $('share-link').select(); $('btn-share-copy').textContent = 'Select and copy the link'; }
 };
 $('btn-share-close').onclick = () => { $('net-share').hidden = true; };
-function showShare() {
-  $('share-code').textContent = net.id;
-  $('share-link').value = inviteLink(net.id);
-  $('btn-share-copy').textContent = 'Copy invite link';
+function showShare(seat) { // an invite for friends, or (seat) a private link that moves this seat to another device
+  $('share-title').textContent = seat ? 'Play on another device' : 'Invite your friends';
+  $('share-text').textContent = seat
+    ? 'Open this link on your phone, tablet or another browser to keep playing this seat there. It also brings the game back if this browser forgets it. Keep it private: anyone with it can play as you.'
+    : "Send them this code or link. They open the game, choose Online Play and join. Each player is told when it's their turn.";
+  $('share-code').textContent = seat ? '' : net.id;
+  $('share-code').hidden = !!seat;
+  $('share-link').value = seat ? seatLink() : inviteLink(net.id);
+  $('btn-share-copy').textContent = seat ? 'Copy private link' : 'Copy invite link';
   $('net-share').hidden = false;
 }
-$('gm-invite').onclick = () => { $('game-menu').hidden = true; showShare(); };
+$('gm-invite').onclick = () => { $('game-menu').hidden = true; showShare(false); };
+$('gm-seat').onclick = () => { $('game-menu').hidden = true; showShare(true); };
 
 /* ---------- boot ---------- */
 resize(); showScreen('home'); requestAnimationFrame(draw);
@@ -4605,11 +4636,15 @@ resize(); showScreen('home'); requestAnimationFrame(draw);
 window.claude?.hot?.snapshot?.(() => (G && !G.over ? { G } : {}));
 function start(data) { if (data && data.G && data.G.v === 3) begin(data.G, true); }
 if (window.claude?.hot?.ready) window.claude.hot.ready(start); else start(window.claude?.hot?.data ?? {});
-// an invite link (?join=CODE) opens the Online Play screen ready to join
+// an invite link (?join=CODE) opens the Online Play screen ready to join;
+// a seat link (?seat=CODE.SEAT.KEY) brings one of your seats onto this device
 {
-  const code = new URLSearchParams(location.search).get('join');
-  if (code && netReady() && !G) {
+  const q = new URLSearchParams(location.search), code = q.get('join'), seat = q.get('seat');
+  if ((code || seat) && netReady() && !G) {
     history.replaceState(null, '', location.pathname);
-    showScreen('online'); $('join-code').value = code.toUpperCase().slice(0, 6); $('btn-join').click();
+    showScreen('online');
+    const m = seat && seat.match(/^([A-Z0-9]{6})\.(\d)\.([0-9a-f]{32})$/);
+    if (m) { netRemember({ id: m[1], seat: +m[2], key: m[3] }); netGuard(() => netOpen(m[1])); }
+    else if (code) { $('join-code').value = code.toUpperCase().slice(0, 6); $('btn-join').click(); }
   }
 }
