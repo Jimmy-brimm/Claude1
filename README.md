@@ -12,7 +12,7 @@ It has original art and code and is not affiliated with Midjiwan. There is no bu
 ## Features
 
 - **Ten tribes**, each starting with a different technology: Zephyr, Ember, Verdant, Solis, Granite and Frost, plus Ashen (volcanoes), Blossom (cherry-blossom valleys), Mire (mushroom swamps) and Lumen (crystal highlands).
-- **2–8 tribes** on 12×12 to 24×24 maps: Continents, Pangea or Archipelago.
+- **2–10 tribes** on 12×12 to 24×24 maps, or the 48×48 **Max** map (four times the area of Huge, up to all ten tribes): Continents, Pangea or Archipelago. Big maps let the camera zoom out further.
 - **Lighthouses** in the four corners of every map. The first sighting of each earns stars and points.
 - **Game modes:** Domination (last tribe standing) and Perfection (highest score after 30 turns).
 - **Difficulty:** Easy, Normal, Hard, Crazy (computer income bonus).

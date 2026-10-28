@@ -194,7 +194,8 @@ function newGame(cfg) {
   }
 
   const mid = Math.floor(n / 2);
-  const S = shuffle([[2, 2], [n - 3, n - 3], [n - 3, 2], [2, n - 3], [mid, 2], [mid, n - 3], [2, mid], [n - 3, mid]].slice(0, np));
+  const third = Math.round(n / 3);
+  const S = shuffle([[2, 2], [n - 3, n - 3], [n - 3, 2], [2, n - 3], [mid, 2], [mid, n - 3], [2, mid], [n - 3, mid], [third, n - third], [n - third, third]].slice(0, np));
   const protect = Array.from({ length: n }, () => Array(n).fill(false));
   for (const [sx, sy] of S) for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
     g[sy + dy][sx + dx] = 1; protect[sy + dy][sx + dx] = true;
@@ -1252,7 +1253,7 @@ function loadSave() { // the most recently saved game in any slot
 }
 function slotSummary(g) { // one line describing a saved game
   const me = g.players.find(p => !p.ai) || g.players[0], humans = g.players.filter(p => !p.ai).length;
-  const size = { 12: 'Small', 16: 'Medium', 20: 'Large', 24: 'Huge' }[g.n] || `${g.n}×${g.n}`;
+  const size = { 12: 'Small', 16: 'Medium', 20: 'Large', 24: 'Huge', 48: 'Max' }[g.n] || `${g.n}×${g.n}`;
   return `${humans > 1 ? `Pass & Play · ${humans} players` : me.name} · Turn ${g.turn} · ${g.mode === 'perfection' ? 'Perfection' : 'Domination'} · ${size} ${g.mapType || ''}`.trim();
 }
 try { // carry a save from before slots existed into slot 1
@@ -4073,8 +4074,9 @@ function endPointer(e, tap) {
 cv.addEventListener('pointerup', e => endPointer(e, true));
 cv.addEventListener('pointercancel', e => endPointer(e, false));
 cv.addEventListener('pointerleave', () => { hover = null; });
+const minZoom = () => (G ? Math.max(0.24, Math.min(0.35, 8.4 / G.n)) : 0.35); // big maps can zoom out further
 function zoomAt(f, sx, sy) { // keep the point under the cursor still
-  const nz = Math.min(2.2, Math.max(0.35, cam.z * f));
+  const nz = Math.min(2.2, Math.max(minZoom(), cam.z * f));
   const wx = (sx - W / 2) / cam.z + cam.x, wy = (sy - H / 2) / cam.z + cam.y;
   cam.z = nz; cam.x = wx - (sx - W / 2) / nz; cam.y = wy - (sy - H / 2) / nz; camGoal = null; zoomGoal = null;
 }
@@ -4082,7 +4084,7 @@ let zoomGoal = null;
 cv.addEventListener('wheel', e => { // mouse wheels and trackpads both glide to the new zoom
   e.preventDefault();
   const d = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaY, from = zoomGoal ? zoomGoal.z : cam.z;
-  zoomGoal = { z: Math.min(2.2, Math.max(0.35, from * Math.exp(-Math.max(-300, Math.min(300, d)) * 0.0012))), sx: e.clientX, sy: e.clientY };
+  zoomGoal = { z: Math.min(2.2, Math.max(minZoom(), from * Math.exp(-Math.max(-300, Math.min(300, d)) * 0.0012))), sx: e.clientX, sy: e.clientY };
   camGoal = null;
 }, { passive: false });
 addEventListener('resize', resize);
@@ -4100,7 +4102,7 @@ addEventListener('keydown', e => {
 });
 
 /* ---------- menus ---------- */
-const MAX_TRIBES = { 12: 4, 16: 6, 20: 8, 24: 8 };
+const MAX_TRIBES = { 12: 4, 16: 6, 20: 8, 24: 8, 48: 10 };
 const setup = { tribe: 0, opp: 2, mode: 'domination', diff: 'normal', n: 16, map: 'continents', mp: false,
   slots: [{ tribe: 0, ai: false }, { tribe: 1, ai: false }] };
 
@@ -4159,14 +4161,14 @@ function renderSettings() {
       <div class="slot-btns"><button type="button" class="btn dark" id="slot-add" ${setup.slots.length >= max ? 'disabled' : ''}>Add player</button>
       <button type="button" class="btn dark" id="slot-remove" ${setup.slots.length <= 2 ? 'disabled' : ''}>Remove player</button></div></div>`;
   } else {
-    html += `<div><span class="set-label">Opponents</span>${seg('opp', [1, 2, 3, 4, 5, 6, 7].map(v => [v, v, v > max - 1]))}</div>`;
+    html += `<div><span class="set-label">Opponents</span>${seg('opp', [1, 2, 3, 4, 5, 6, 7, 8, 9].map(v => [v, v, v > max - 1]))}</div>`;
   }
   html += `<div><span class="set-label">Game mode</span><div class="mode-cards seg" data-key="mode">
       <button type="button" data-v="domination" class="${setup.mode === 'domination' ? 'on' : ''}"><b>Domination</b><span>Play until only one tribe is left.</span></button>
       <button type="button" data-v="perfection" class="${setup.mode === 'perfection' ? 'on' : ''}"><b>Perfection</b><span>Get the highest score in 30 turns.</span></button>
     </div></div>
     <div><span class="set-label">Difficulty</span>${seg('diff', [['easy', 'Easy'], ['normal', 'Normal'], ['hard', 'Hard'], ['crazy', 'Crazy']])}</div>
-    <div><span class="set-label">Map size</span>${seg('n', [[12, 'Small'], [16, 'Medium'], [20, 'Large'], [24, 'Huge']])}</div>
+    <div><span class="set-label">Map size</span>${seg('n', [[12, 'Small'], [16, 'Medium'], [20, 'Large'], [24, 'Huge'], [48, 'Max']])}</div>
     <div><span class="set-label">Map type</span>${seg('map', [['continents', 'Continents'], ['pangea', 'Pangea'], ['archipelago', 'Archipelago']])}</div>`;
   const saved = setup.online ? [] : [1, 2, 3].map(loadSlot);
   if (setup.online) { /* online games are stored on the server, not in a slot */ }
