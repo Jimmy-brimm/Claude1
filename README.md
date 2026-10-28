@@ -16,6 +16,7 @@ It has original art and code and is not affiliated with Midjiwan. There is no bu
 - **Lighthouses** in the four corners of every map. The first sighting of each earns stars and points.
 - **Game modes:** Domination (last tribe standing) and Perfection (highest score after 30 turns).
 - **Difficulty:** Easy, Normal, Hard, Crazy (computer income bonus).
+- **Online play:** turn-by-turn games between devices through a free Supabase project. Create a game, share a 6-letter code or invite link, and each device is told when it's its turn. See [Online play](#online-play).
 - **Pass and play:** set any extra player to Human to play hot-seat on one device, with a hand-over screen between turns. Each player picks a tribe from the full illustrated tribe gallery.
 - **Tech tree** of 35 technologies. The first 25 are laid out like Polytopia's: Riding → Roads → Trade and Free Spirit → Chivalry; Organization → Farming → Construction and Strategy → Diplomacy; Climbing → Mining → Smithery and Meditation → Philosophy; Fishing → Sailing → Navigation and Whaling → Aquatism; Hunting → Archery → Spiritualism and Forestry → Mathematics. A fourth ring adds Banking, Horsemanship, Engineering (aqueducts), Fortification (build walls), Steelworking, Medicine, Cartography, Admiralty, Husbandry (pastures) and Ballistics.
 - **Units with skills:** Warrior, Rider, Archer, Defender, Swordsman, Mind Bender, Catapult, Knight and the Giant. Skills include *dash* (attack after moving), *escape* (move after attacking), *persist* (attack again after a kill, a quarter weaker each time), *fortify* (city defence bonus), *heal* and *convert*.
@@ -43,6 +44,33 @@ The rules follow *The Battle of Polytopia* as closely as possible:
 
 Where Polytopia's exact numbers are uncertain, the closest reasonable value is used; for example, Diplomacy gives +1 star per tribe met.
 
+## Online play
+
+Friends on different devices can share one game, turn by turn, like Polytopia's multiplayer. The device whose turn it is plays the turn, runs any computer players that come next, and uploads the game. The others check for a new version every few seconds while they wait, and get a browser notification if the game is in the background.
+
+### One-time setup
+
+1. Create a free project at [supabase.com](https://supabase.com).
+2. In the project, open **SQL Editor → New query**, paste the contents of [`supabase/schema.sql`](supabase/schema.sql) and press **Run**.
+3. Open the project's API settings and copy the **Project URL** and the **anon** (or **publishable**) key.
+4. Put both in [`config.js`](config.js) and push. Both values are meant to be public: clients cannot touch the tables directly, only call the functions in `schema.sql`.
+5. Serve the site from a web address, for example GitHub Pages (see [Play](#play)).
+
+Free Supabase projects pause after a stretch without use; resume yours from the Supabase dashboard if online play stops answering.
+
+### Playing
+
+- **Create:** Main menu → Online Play → enter your name → Create Game. Set each other seat to Online or Computer, pick tribes and settings, then share the code or invite link that appears.
+- **Join:** open the invite link, or go to Online Play and type the code, then pick a free seat.
+- **Your games:** Online Play lists every game this device has a seat in, with whose turn it is.
+- If your connection drops while you end a turn, the turn is kept on the device and sent again automatically.
+
+### Limits
+
+- Each device proves its seat with a secret key kept in that browser. Clearing site data loses the seat.
+- The server checks whose turn it is and refuses stale or out-of-turn uploads. It does not re-check the rules, and every player downloads the whole map, including areas hidden by fog. This is fine for games among friends, but not for public matchmaking.
+- There is no resign button or turn timer yet. Finished games stay in the database until you delete them.
+
 ## Interface
 
 The layout follows the mobile 4X classics. Score, turn and stars sit across the top. Three round buttons along the bottom open the **Game** menu (tribe standings, sound, help), the **Tech Tree** (a radial tree around your tribe) and **End Turn**, which glows when every unit has acted.
@@ -56,4 +84,6 @@ Keyboard: `E` end turn, `N` next unit, `T` technology, `Esc` close or deselect.
 ## Files
 
 - `index.html`, `style.css`: page shell, menus and HUD
-- `game.js`: map generation, rules, computer players, rendering and input
+- `game.js`: map generation, rules, computer players, rendering, input and online play
+- `config.js`: the Supabase project used for online play
+- `supabase/schema.sql`: the database tables and functions for online play

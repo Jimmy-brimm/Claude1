@@ -159,6 +159,29 @@ kbd{background:#0006;border:1px solid var(--line);border-radius:4px;padding:0 5p
 .seg button.on{background:var(--blue);box-shadow:0 3px 0 var(--blue-edge)}
 .seg button:disabled{opacity:.35;cursor:not-allowed}
 .slot-warn{margin:8px 0 0;color:#ffd79a;font-size:14px}
+.net-error{margin:6px 0 0;min-height:1em;color:#ffb3a6;font-weight:700;text-align:center}
+.online-box{width:min(560px,100%);display:grid;gap:10px;background:var(--panel);border-radius:20px;padding:18px;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+.online-box p{margin:0}
+.online-box input,#share-link{width:100%;min-width:0;background:var(--dark);border:0;border-radius:11px;padding:11px 12px;color:var(--text);font:700 16px var(--font-body)}
+.online-actions{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center}
+.join-row{display:grid;grid-template-columns:1fr auto;gap:8px}
+#join-code{text-transform:uppercase;letter-spacing:3px;font-family:var(--font-display)}
+#online-list{display:grid;gap:10px}
+.online-card{grid-template-columns:1fr auto}
+.save-text .your-turn{color:var(--good);font:800 15px var(--font-body);letter-spacing:0}
+#seat-list{display:grid;gap:8px;margin:10px 0}
+.slot-tribe.seat:disabled{opacity:.55;cursor:default}
+.share-code{font:400 44px var(--font-display);letter-spacing:8px;text-align:center;margin:8px 0;color:var(--gold)}
+#share-link{margin-bottom:6px;font-size:14px}
+body.net-busy,body.net-busy *{cursor:progress !important}
+@media (max-width:640px){
+  .online-actions{grid-template-columns:1fr}
+  .save-card,.online-card{grid-template-columns:52px 1fr}
+  .save-card.online-card{grid-template-columns:1fr}
+  .online-card .save-text{grid-column:1 / -1}
+  .save-card img{width:52px;height:52px}
+  .save-btns{grid-column:1 / -1;grid-template-columns:1fr 1fr}
+}
 #save-list{width:min(560px,100%);display:grid;gap:12px}
 .save-card{display:grid;grid-template-columns:64px 1fr auto;align-items:center;gap:12px;background:var(--panel);border-radius:18px;padding:12px 14px;
   border-left:6px solid var(--c,#2a4269);box-shadow:0 6px 18px rgba(0,0,0,.35)}
