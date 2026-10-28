@@ -55,6 +55,7 @@
     <div class="stack">
       <button class="btn green" id="btn-resume">Resume Game</button>
       <button class="btn green" id="btn-continue">Continue Saved Game</button>
+      <button class="btn blue" id="btn-saves">Saved Games</button>
       <button class="btn blue" id="btn-new">New Game</button>
       <button class="btn blue" id="btn-mp">Pass &amp; Play</button>
       <button class="btn dark" id="btn-howto">How to Play</button>
@@ -65,6 +66,12 @@
     <h2 class="screen-title">Choose your tribe</h2>
     <div id="tribe-grid"></div>
     <div class="row center"><button class="btn dark" id="btn-tribe-back">Back</button></div>
+  </section>
+
+  <section class="screen" id="scr-saves" hidden>
+    <h2 class="screen-title">Saved Games</h2>
+    <div id="save-list"></div>
+    <div class="row center"><button class="btn dark" id="btn-saves-back">Back</button></div>
   </section>
 
   <section class="screen" id="scr-settings" hidden>
@@ -84,7 +91,7 @@
     <span id="tech-stars" class="pill-stars"></span>
     <button class="x" id="btn-tech-close" aria-label="Close tech tree">✕</button>
   </div>
-  <div class="tech-scroll" id="tech-scroll"><svg id="tech-svg" viewBox="0 0 800 800" role="group" aria-label="Technologies"></svg></div>
+  <div class="tech-scroll" id="tech-scroll"><svg id="tech-svg" viewBox="0 0 1000 1000" role="group" aria-label="Technologies"></svg></div>
   <div id="tech-pop" class="popup" hidden>
     <h3 id="tp-title"></h3>
     <p id="tp-desc"></p>
@@ -115,7 +122,7 @@
 <div id="reward" class="overlay" hidden>
   <div class="popup">
     <h2 id="reward-title"></h2>
-    <p class="muted">Choose a reward for your city.</p>
+    <p class="muted" id="reward-sub">Choose a reward for your city.</p>
     <div id="reward-opts"></div>
   </div>
 </div>
@@ -134,13 +141,15 @@
   <div class="popup wide">
     <h2>How to Play</h2>
     <ul>
-      <li><b>Win</b> in Domination by capturing every rival city. In Perfection, have the highest score after 30 turns.</li>
-      <li><b>Move and attack.</b> Tap a unit, then a white dot to move or a red marker to attack. A unit can move then attack. Attacking ends its turn.</li>
-      <li><b>Villages and ruins.</b> Walk onto a village to make it your city. Explore ruins for stars, tech, maps or a veteran. Walk into an empty enemy city to capture it.</li>
-      <li><b>Stars</b> come in every turn from your cities. Spend them on units, technology and city growth.</li>
-      <li><b>Grow cities</b> by harvesting fruit, animals and fish or building farms, mines, lumber huts and ports inside your borders. The pips under a city's name show its progress to the next level.</li>
-      <li><b>Tech Tree</b> unlocks units, harvests and movement: Climbing for mountains, Sailing for boats, Navigation for deep ocean.</li>
-      <li><b>Combat.</b> Damage depends on attack, defence and health. Cities, walls, forests (with Archery) and mountains (with Climbing) protect defenders. Units that skip a turn heal. Three kills make a veteran.</li>
+      <li><b>Win</b> in Domination by capturing every rival capital and city. In Perfection, have the highest score after 30 turns.</li>
+      <li><b>Each unit gets one move and one attack per turn.</b> Tap a unit, then a white dot to move or a red marker to attack. Skills change the order: <i>Dash</i> attacks after moving, <i>Escape</i> moves after attacking, <i>Persist</i> attacks again after a kill, a quarter weaker each time.</li>
+      <li><b>Nothing is taken on arrival.</b> A unit has to start its turn on a village, enemy city or ruin before it can Capture or Examine it, which uses its whole turn. Ruins give stars, tech, an explorer, a veteran or population.</li>
+      <li><b>Stars</b> arrive every turn: one per city level, plus one for your capital, plus workshops, parks, markets and Diplomacy.</li>
+      <li><b>Grow cities</b> with harvests and buildings inside their borders: fruit, game, fish, farms, lumber huts, mines and ports. Windmills, sawmills and forges grow with neighbouring farms, lumber huts and mines. Temples add population. Each city supports one unit per level, plus one, and offers three rewards to choose from at every level.</li>
+      <li><b>Technology</b> costs more with every city you own. Climbing opens mountains, Fishing builds ports to board boats, Sailing crosses the ocean and makes Ships, Navigation makes Battleships, Roads halve movement. A fourth ring of ten advanced technologies goes beyond the classic tree.</li>
+      <li><b>Movement.</b> Forests and mountains stop a unit, and so does stepping next to an enemy. Units board boats only at their own ports.</li>
+      <li><b>Combat.</b> Damage depends on attack, defence and health. Defenders get ×1.5 in forests (Archery), on mountains (Climbing), in water (Aquatism) and in cities, and ×4 behind city walls. Units that skip moving and attacking can <i>Recover</i>: +4 health in your borders, +2 outside. Three kills unlock <i>Promote</i>: choose +5 health, +1 attack, +1 defence or +1 movement.</li>
+      <li><b>Saving.</b> There are three save slots. Pick one when you start a game; it saves after every turn. Load or delete games under Saved Games.</li>
       <li><b>Controls.</b> Drag to pan, scroll or pinch to zoom. <kbd>E</kbd> end turn, <kbd>N</kbd> next unit, <kbd>T</kbd> tech tree, <kbd>Esc</kbd> close or deselect.</li>
     </ul>
     <div class="row center"><button class="btn green" id="btn-help-close">Got it</button></div>
