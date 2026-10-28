@@ -22,10 +22,11 @@ It has original art and code and is not affiliated with Midjiwan. There is no bu
 - **Units with skills:** Warrior, Rider, Archer, Defender, Swordsman, Mind Bender, Catapult, Knight and the Giant. Skills include *dash* (attack after moving), *escape* (move after attacking), *persist* (attack again after a kill, a quarter weaker each time), *fortify* (city defence bonus), *heal* and *convert*.
 - **Boats:** units board at their own ports and become Boats, upgradeable at sea to Ships (Sailing) and Battleships (Navigation).
 - **Cities** grow from harvests and buildings in their borders: fruit, game, fish, whales, farms, lumber huts, mines and ports, plus windmills, sawmills and forges (which grow with neighbouring industry), markets and four kinds of temple. Every level offers three rewards: workshop, explorer or militia; walls, resources or watchtower; population, border growth or barracks; park, Giant or academy.
+- **Alliances** with computer or human tribes: shared vision, no fighting, +1 ⭐ a turn each, and a shared victory when every tribe left is allied. Computer tribes court allies against the leader and drop allies who grow too strong.
 - **Ruins** hold stars, free technology, an explorer, a veteran swordsman or new citizens.
 - **Look and feel:** low-poly isometric art drawn in code. Each tribe's homeland has its own climate (meadow, autumn woods, jungle, desert, highland, tundra) with matching trees, rock, fruit and wildlife (deer, boar, tapir, camel, goat, reindeer). Land sits on earthen slabs; the sea blends from turquoise shallows to deep blue, with surf and glints. Every tribe has its own headgear and its own architecture (yurts, timber houses, stilt huts, adobe, stone keeps, igloos) that grows with city level. Objects cast soft shadows, clouds part as you explore, and snow, leaves, petals, embers, fireflies, sparkles and butterflies drift over their regions. Units walk their path tile by tile, and zoom glides. The main menu shows a living world map.
 - **Shaders:** a WebGL pass adds bloom, colour grading, drifting cloud shadows and a vignette. It falls back to plain canvas when WebGL is missing, switches itself off if frames get slow, and has an on/off toggle in the Game menu.
-- **Fog of war**, computer opponents that research, build, expand and use boats.
+- **Fog of war**: units see two tiles (four from a mountain) and cities see well past their borders; computer opponents that research, build, expand and use boats.
 - **Three save slots**, chosen when a game starts and saved after every turn. Saved Games loads or deletes them.
 - **Autosave** to the browser after every turn, sound effects with a mute toggle, mouse and touch controls.
 
@@ -35,11 +36,13 @@ The rules follow *The Battle of Polytopia* as closely as possible:
 
 - **Turns.** Each unit gets one move and one attack per turn, in that order, unless a skill changes it. New units wait a turn.
 - **Capturing.** Nothing is taken on arrival. A unit that *starts* its turn on a village or enemy city can Capture it, and on ruins it can Examine them. Either uses its whole turn.
-- **Roads** can be built on any land in your territory, with or without a unit on it, and on unclaimed land where your own unit stands.
+- **Roads** can be built on any land in your territory, with or without a unit on it, and on unclaimed land where your own unit stands. When roads join two of your cities (passing through other cities counts), both gain a citizen, once for each pair. Computer tribes build these routes too.
+- **Alliances.** Offer one from the Game menu to any tribe you have met; computer tribes decide at once (they weigh common rivals, strength, recent fighting and betrayals), human players on their turn. Allies cannot attack each other or capture each other's cities, exert no zone of control on each other, share vision and each get +1 ⭐ a turn. Breaking an alliance is immediate, and the other side refuses new offers for 10 turns. When every surviving tribe is allied with every other, the game ends in an alliance victory; computer tribes won't accept an alliance that would end the game outright.
+- **City growth.** A city needs 2, 2, 3, 3, 4, 4, 5 citizens to reach each next level (easier than Polytopia's 2, 3, 4, 5…).
 - **Movement.** Forests and mountains end a move, and so does stepping next to an enemy (zone of control). Roads halve the cost between road and city tiles. Units board boats only from their own ports. Ocean needs Sailing; mountains need Climbing.
 - **Combat.** Attack force = attack × health ratio; defence force = defence × health ratio × bonus; damage = round(attack share × attack × 4.5), and the defender strikes back if it survives and is in range. Bonuses: ×1.5 in cities (fortify units), forests (Archery), mountains (Climbing) and water (Aquatism), ×4 behind city walls. Melee winners advance. Knights (attack 3) lose a quarter of their damage with each Persist follow-up.
 - **Healing.** A unit that has not moved or attacked can Recover: +4 health in your borders, +2 outside. Mind Benders heal neighbours. Three kills let a unit Promote to veteran with a perk of your choice (+5 max health, +1 attack, +1 defence or +1 movement), fully healed.
-- **Economy.** Income is the sum of city levels, +1 for the capital, plus workshops, parks, markets and Diplomacy. Tech costs tier × number of cities + 4 (a third less with Philosophy). A city supports one unit per level, plus one; disbanding with Free Spirit refunds half.
+- **Economy.** Income is the sum of city levels, +1 for the capital, plus workshops, parks, markets, Diplomacy and +1 per ally. Tech costs tier × number of cities + 4 (a third less with Philosophy). A city supports one unit per level, plus one; disbanding with Free Spirit refunds half.
 - **Score.** Points for territory, city levels, technology, units, parks and exploration, as in Perfection mode.
 
 Where Polytopia's exact numbers are uncertain, the closest reasonable value is used; for example, Diplomacy gives +1 star per tribe met.
@@ -62,12 +65,14 @@ Free Supabase projects pause after a stretch without use; resume yours from the 
 
 - **Create:** Main menu → Online Play → enter your name → Create Game. Set each other seat to Online or Computer, pick tribes and settings, then share the code or invite link that appears.
 - **Join:** open the invite link, or go to Online Play and type the code, then pick a free seat.
-- **Your games:** Online Play lists every game this device has a seat in, with whose turn it is.
+- **Your games:** Online Play lists every game this device has a seat in, with whose turn it is. The home screen shows how many are waiting for you, and Saved Games links to them.
+- **Come back whenever:** finished turns are saved on the server. A half-played turn is kept on the device after every action and restored when you reopen the game, even after closing the page.
+- **Another device:** Game menu → *Play on another device* gives a private link that brings your seat to a phone, tablet or other browser. It also recovers the game if this browser forgets it. Anyone with that link can play as you.
 - If your connection drops while you end a turn, the turn is kept on the device and sent again automatically.
 
 ### Limits
 
-- Each device proves its seat with a secret key kept in that browser. Clearing site data loses the seat.
+- Each device proves its seat with a secret key kept in that browser. Clearing site data loses the seat unless you saved its *Play on another device* link.
 - The server checks whose turn it is and refuses stale or out-of-turn uploads. It does not re-check the rules, and every player downloads the whole map, including areas hidden by fog. This is fine for games among friends, but not for public matchmaking.
 - There is no resign button or turn timer yet. Finished games stay in the database until you delete them.
 
