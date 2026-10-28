@@ -4215,7 +4215,8 @@ const seatName = (seats, i) => (seats && seats[i] && seats[i].name) || TRIBES[(s
 async function rpc(fn, args) {
   const headers = { apikey: NET.anonKey, 'Content-Type': 'application/json' };
   if (/^eyJ/.test(NET.anonKey)) headers.Authorization = `Bearer ${NET.anonKey}`; // legacy anon keys are JWTs; publishable keys go in apikey only
-  const res = await fetch(`${NET.url.replace(/\/+$/, '')}/rest/v1/rpc/${fn}`, { method: 'POST', headers, body: JSON.stringify(args) });
+  const base = NET.url.replace(/\/+$/, '').replace(/\/rest\/v1$/, ''); // accept the URL with or without /rest/v1
+  const res = await fetch(`${base}/rest/v1/rpc/${fn}`, { method: 'POST', headers, body: JSON.stringify(args) });
   const body = await res.json().catch(() => null);
   if (!res.ok) { const err = new Error((body && (body.message || body.error || body.hint)) || `Server error ${res.status}`); err.server = true; throw err; }
   return body;
