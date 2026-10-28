@@ -594,15 +594,33 @@ function examine(u) {
   updateVis();
   return true;
 }
-function explorerWalk(p, x, y, steps) { // a scout wanders off and maps what it passes
+// A scout sets off for the nearest unexplored tiles (by land or by canoe) and maps everything it passes.
+// Returns how many tiles it uncovered and where it ended up.
+function explorerWalk(p, x, y, steps) {
+  const V = G.vis[p], hidden = () => V.reduce((s, r) => s + r.filter(v => !v).length, 0), before = hidden();
   let cx = x, cy = y;
   for (let i = 0; i < steps; i++) {
-    const opts = DIRS.map(([dx, dy]) => [cx + dx, cy + dy]).filter(([a, b]) => inb(a, b) && !isWater(T(a, b)));
-    if (!opts.length) break;
-    const unseen = opts.filter(([a, b]) => !G.vis[p][b][a]);
-    [cx, cy] = (unseen.length ? unseen : opts)[randInt((unseen.length ? unseen : opts).length)];
+    const dirs = DIRS.slice().sort(() => rand() - 0.5), prev = new Map([[cx + ',' + cy, null]]), q = [[cx, cy]];
+    let goal = null;
+    for (let k = 0; k < q.length && !goal; k++) for (const [dx, dy] of dirs) {
+      const a = q[k][0] + dx, b = q[k][1] + dy, key = a + ',' + b;
+      if (!inb(a, b) || prev.has(key)) continue;
+      prev.set(key, q[k]); q.push([a, b]);
+      if (!V[b][a]) { goal = [a, b]; break; }
+    }
+    if (!goal) break; // the whole world is mapped
+    let step = goal;
+    for (let back = prev.get(step[0] + ',' + step[1]); back && (back[0] !== cx || back[1] !== cy); back = prev.get(step[0] + ',' + step[1])) step = back;
+    [cx, cy] = step;
     reveal(p, cx, cy, 2);
   }
+  return { found: before - hidden(), x: cx, y: cy };
+}
+function sendExplorer(p, x, y, steps) { // run an explorer and tell its owner what it found
+  const r = explorerWalk(p, x, y, steps);
+  if (!r.found) { G.players[p].stars += 5; tellOwner(p, 'The lands are already mapped, so your explorer brings back 5 ⭐ instead.'); return; }
+  tellOwner(p, `Your explorer mapped ${r.found} new tiles. 🧭`);
+  if (p === G.view) camGoal = { x: (wxOf(x, y) + wxOf(r.x, r.y)) / 2, y: (wyOf(x, y) + wyOf(r.x, r.y)) / 2 + TH / 2, z: camGoal && camGoal.z }; // look towards what it found
 }
 function ruinReward(u, x, y) {
   const p = u.owner, pl = G.players[p];
@@ -615,7 +633,7 @@ function ruinReward(u, x, y) {
   sfxAt('tech', x, y); burst(x, y, 'level');
   if (kind === 'stars') { pl.stars += 10; popFx(x, y, '+10 ⭐', '#ffe27a'); tellOwner(p, 'The ruins held a hidden treasure: +10 ⭐'); }
   else if (kind === 'tech') { const k = techs[randInt(techs.length)]; pl.techs.push(k); tellOwner(p, `Ancient scrolls taught you ${TECHS[k].icon} ${TECHS[k].name}!`); }
-  else if (kind === 'explorer') { explorerWalk(p, x, y, 15); tellOwner(p, 'An explorer joins you and maps the nearby lands.'); }
+  else if (kind === 'explorer') sendExplorer(p, x, y, 15);
   else if (kind === 'pop') { addPop(cap, 3, p); tellOwner(p, `Refugees settle in ${cap.b.name}: +3 population.`); }
   else {
     spawns.set(G.nextId, performance.now());
@@ -802,7 +820,7 @@ function addPop(c, amount, p) {
   }
 }
 function rewardOptions(level) {
-  if (level === 2) return [['workshop', '🔨', 'Workshop', '+1 ⭐ every turn'], ['explorer', '🧭', 'Explorer', 'A scout maps the lands around the city'], ['militia', '⚔️', 'Militia', 'A free Warrior joins you in this city']];
+  if (level === 2) return [['workshop', '🔨', 'Workshop', '+1 ⭐ every turn'], ['explorer', '🧭', 'Explorer', 'A scout sets off for unexplored lands and maps them'], ['militia', '⚔️', 'Militia', 'A free Warrior joins you in this city']];
   if (level === 3) return [['wall', '🧱', 'City wall', 'Fortified units in the city defend at ×4'], ['resources', '💰', 'Resources', '+5 ⭐ right now'], ['tower', '🗼', 'Watchtower', 'The city sees four tiles further']];
   if (level === 4) return [['popgrowth', '👥', 'Population growth', '+3 population'], ['border', '🗺️', 'Border growth', 'City borders grow by one ring'], ['barracks', '🎖️', 'Barracks', 'Units trained here start as veterans']];
   return [['park', '🌳', 'Park', '+1 ⭐ every turn and 250 points'], ['giant', '🗿', 'Super unit', 'A Giant joins you in this city'], ['academy', '🎓', 'Academy', 'Every technology costs 1 ⭐ less']];
@@ -818,7 +836,7 @@ function applyReward(c, key, p) {
   const b = c.b, pl = G.players[p];
   if (key === 'workshop') b.workshop = (b.workshop || 0) + 1;
   else if (key === 'park') b.park = (b.park || 0) + 1;
-  else if (key === 'explorer') explorerWalk(p, c.x, c.y, 15);
+  else if (key === 'explorer') sendExplorer(p, c.x, c.y, 20);
   else if (key === 'wall') b.wall = true;
   else if (key === 'resources') pl.stars += 5;
   else if (key === 'popgrowth') addPop(c, 3, p);
