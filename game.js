@@ -333,7 +333,7 @@ function cityLand(c, p) { // tiles that belong to this city
   }
   return out;
 }
-const popNeeded = b => b.level + 1;
+const popNeeded = b => Math.ceil((b.level + 2) / 2); // 2, 2, 3, 3, 4, 4, 5 citizens per level
 const cityHas = (c, p, imp) => cityLand(c, p).some(t => T(t.x, t.y).imp === imp);
 function countNear(x, y, imp, p) {
   let n = 0;
@@ -347,13 +347,75 @@ function marketStars(c, p) {
 }
 const cityIncome = (c, p) => c.b.level + (c.b.capital ? 1 : 0) + (c.b.workshop || 0) + (c.b.park || 0) + marketStars(c, p) +
   (c.b.level >= 3 && hasTech(p, 'banking') ? 1 : 0);
-function metTribes(p) { // rival tribes whose cities or units this player has seen
+function metList(p) { // other living tribes whose cities or units this player has seen
   const V = G.vis[p], met = new Set();
   for (const c of cityTiles()) if (c.b.owner !== p && V[c.y][c.x]) met.add(c.b.owner);
   for (const u of G.units) if (u.owner !== p && V[u.y][u.x] === 2) met.add(u.owner);
-  return [...met].filter(q => G.players[q].alive).length;
+  return [...met].filter(q => G.players[q].alive);
 }
-const income = p => cityTiles(p).reduce((s, c) => s + cityIncome(c, p), 0) + (hasTech(p, 'diplomacy') ? metTribes(p) : 0);
+const metTribes = p => metList(p).length;
+// income: city stars, Diplomacy's +1 per tribe met, and +1 for every ally (trade between friends)
+const income = p => cityTiles(p).reduce((s, c) => s + cityIncome(c, p), 0) + (hasTech(p, 'diplomacy') ? metTribes(p) : 0) + alliesOf(p).length;
+
+/* ---------- diplomacy ---------- */
+// Alliances are between two tribes. Allies cannot attack each other or take each other's cities,
+// do not block each other's movement, share what they see and each earn a star a turn.
+const allied = (a, b) => a === b || !!(G && G.allies && G.allies[a] && G.allies[a][b]);
+const hostile = (a, b) => !allied(a, b);
+const alliesOf = p => G.players.map((_, i) => i).filter(i => i !== p && G.players[i].alive && allied(p, i));
+const pairKey = (a, b) => `${a},${b}`;
+function setAlliance(a, b, on) {
+  if (!G.allies) G.allies = G.players.map(() => G.players.map(() => false));
+  G.allies[a][b] = G.allies[b][a] = on;
+  G.proposals = (G.proposals || []).filter(q => !((q.from === a && q.to === b) || (q.from === b && q.to === a)));
+  updateVis();
+  if (on) checkElim(); // the last tribes standing may now all be friends
+}
+function allianceWouldEnd(a, b) { // would every tribe left then be allied with every other?
+  const alive = G.players.map((_, i) => i).filter(i => G.players[i].alive);
+  return alive.every(x => alive.every(y => x === y || allied(x, y) || (x === a && y === b) || (x === b && y === a)));
+}
+function aiAccepts(ai, from) { // a computer tribe weighs an offer of alliance
+  if ((G.grudges || {})[pairKey(ai, from)] > G.turn) return false; // betrayed recently
+  if (allianceWouldEnd(ai, from)) return false;                    // someone has to be left to beat
+  const mine = score(ai), theirs = score(from);
+  const rival = Math.max(0, ...G.players.map((pl, i) => (pl.alive && i !== ai && i !== from && !allied(ai, i) ? score(i) : 0)));
+  let chance = 0.2;
+  if (rival > Math.max(mine, theirs) * 0.9) chance += 0.45; // a common threat
+  if (theirs > mine * 1.3) chance += 0.25;                  // a strong friend is worth having
+  if ((G.fights || {})[pairKey(ai, from)] >= G.turn - 3) chance -= 0.35; // fought each other lately
+  return rand() < chance;
+}
+function proposeAlliance(from, to) { // 'accepted', 'refused' or 'sent' (a human answers on their turn)
+  if (allied(from, to) || !G.players[to].alive) return 'refused';
+  G.asked = G.asked || {};
+  G.asked[pairKey(from, to)] = G.turn; // one offer per tribe per turn
+  if (G.players[to].ai) {
+    if (!aiAccepts(to, from)) return 'refused';
+    setAlliance(from, to, true);
+    return 'accepted';
+  }
+  G.proposals = (G.proposals || []).filter(q => !(q.from === from && q.to === to));
+  G.proposals.push({ from, to, turn: G.turn });
+  return 'sent';
+}
+function breakAlliance(by, other) {
+  setAlliance(by, other, false);
+  G.grudges = G.grudges || {};
+  G.grudges[pairKey(other, by)] = G.turn + 10; // they will not trust the breaker again for a while
+  if (other === G.view || by === G.view) toast(`${G.players[by].name} broke the alliance with ${G.players[other].name}.`);
+}
+const offeredThisTurn = (a, b) => (G.asked || {})[pairKey(a, b)] === G.turn;
+function aiDiplomacy(p) { // computer tribes court allies against the leader and drop allies who grow too strong
+  for (const q of alliesOf(p)) if (score(q) > score(p) * 1.8 && rand() < 0.08) breakAlliance(p, q);
+  if (rand() > 0.12) return;
+  const leaderScore = i => Math.max(0, ...G.players.map((pl, k) => (pl.alive && k !== p && k !== i && !allied(p, k) ? score(k) : 0)));
+  const options = metList(p).filter(q => !allied(p, q) && !offeredThisTurn(p, q) && !(G.proposals || []).some(x => x.from === p && x.to === q) &&
+    !allianceWouldEnd(p, q) && leaderScore(q) > Math.max(score(p), score(q)));
+  if (!options.length) return;
+  const q = options[randInt(options.length)], res = proposeAlliance(p, q);
+  if (res === 'accepted' && (p === G.view || q === G.view)) toast(`${G.players[p].name} and ${G.players[q].name} are now allies.`);
+}
 const unitCount = p => G.units.filter(u => u.owner === p).length;
 const unitCap = p => cityTiles(p).reduce((s, c) => s + c.b.level + 1, 0);
 const supported = (c, p) => G.units.filter(u => u.owner === p && u.home && u.home.x === c.x && u.home.y === c.y).length;
@@ -371,7 +433,7 @@ function terrainOk(p, tl, afloat) {
   return tl.t === 'water' || hasTech(p, 'sailing');
 }
 const isPortFor = (x, y, p) => T(x, y).imp === 'port' && tileOwner(x, y) === p;
-function isCapturable(tl, p) { return !!tl.b && (tl.b.kind !== 'city' || tl.b.owner !== p); }
+function isCapturable(tl, p) { return !!tl.b && (tl.b.kind !== 'city' || hostile(tl.b.owner, p)); }
 const afloat = u => isWater(T(u.x, u.y));
 const PERKS = {
   hp:  { icon: '❤️', name: 'Toughness', desc: '+5 max health' },
@@ -391,7 +453,7 @@ function stats(u) { // base numbers for the unit (or its boat), plus technology 
 const has = (u, s) => stats(u).skills.includes(s);
 const canMove = u => !u.done && !u.moved && (!u.attacked || has(u, 'escape'));
 const canAttack = u => !u.done && !u.attacked && (!u.moved || has(u, 'dash')) && (stats(u).atk > 0 || has(u, 'convert'));
-const canCapture = u => { const b = T(u.x, u.y).b; return !u.done && !u.moved && !u.attacked && !!b && (b.kind === 'village' || (b.kind === 'city' && b.owner !== u.owner)); };
+const canCapture = u => { const b = T(u.x, u.y).b; return !u.done && !u.moved && !u.attacked && !!b && (b.kind === 'village' || (b.kind === 'city' && hostile(b.owner, u.owner))); };
 const canExamine = u => { const b = T(u.x, u.y).b; return !u.done && !u.moved && !u.attacked && !!b && b.kind === 'ruin'; };
 const recoverAmount = u => (tileOwner(u.x, u.y) === u.owner ? 4 : 2) + (hasTech(u.owner, 'medicine') ? 2 : 0);
 const canRecover = u => !u.done && !u.moved && !u.attacked && u.hp < maxHp(u);
@@ -429,7 +491,7 @@ function reach(u, prev) {
   if (!canMove(u)) return [];
   const p = u.owner, startW = afloat(u), mv = stats(u).mv;
   const zoc = new Set();
-  for (const e of G.units) if (e.owner !== p) for (const [dx, dy] of DIRS) zoc.add((e.x + dx) + ',' + (e.y + dy));
+  for (const e of G.units) if (hostile(e.owner, p)) for (const [dx, dy] of DIRS) zoc.add((e.x + dx) + ',' + (e.y + dy));
   const roadish = (x, y) => { const t = T(x, y); return !!t.road || (!!t.b && t.b.kind === 'city'); };
   const best = new Map([[u.x + ',' + u.y, 0]]), out = [], q = [[0, u.x, u.y]];
   while (q.length) {
@@ -458,7 +520,7 @@ function reach(u, prev) {
 function targetsFor(u, viewOnly) {
   if (!canAttack(u)) return [];
   const r = stats(u).range;
-  return G.units.filter(e => e.owner !== u.owner && cheb(u, e) <= r && (!viewOnly || seenByView(e.x, e.y)));
+  return G.units.filter(e => hostile(e.owner, u.owner) && cheb(u, e) <= r && (!viewOnly || seenByView(e.x, e.y)));
 }
 // Roads go on any land in your territory, with or without a unit there, and on unclaimed land your unit stands on.
 function roadAllowed(p, x, y) {
@@ -521,6 +583,7 @@ function capture(u) {
   u.done = true;
   sfxAt('capture', u.x, u.y); burst(u.x, u.y, 'capture', G.players[p].color);
   updateVis();
+  linkCities(p);
   checkElim();
   return true;
 }
@@ -607,6 +670,8 @@ function convert(a, d) { // a mind bender wins the enemy over
   updateVis();
 }
 function attack(a, d) {
+  G.fights = G.fights || {};
+  G.fights[pairKey(a.owner, d.owner)] = G.fights[pairKey(d.owner, a.owner)] = G.turn;
   if (has(a, 'convert')) return convert(a, d);
   const r = combatCalc(a, d, cheb(a, d)), now = performance.now();
   const dwx = wxOf(d.x, d.y) - wxOf(a.x, a.y);
@@ -675,6 +740,7 @@ function doWork(x, y, key, p) {
   if (pop) popFx(x, y, `+${pop} pop`, '#8fe39a');
   sfxAt('work', x, y); burst(x, y, 'work');
   if (pop) addPop(c, pop, p);
+  if (key === 'road') linkCities(p);
   return true;
 }
 function research(p, k) {
@@ -686,6 +752,44 @@ function research(p, k) {
 }
 
 /* ---------- city growth ---------- */
+// Roads link cities: whenever two of a tribe's cities become joined by roads (passing through its
+// other cities counts), both gain a citizen, once for each pair.
+const linkKey = (p, a, b) => { const [m, n] = [`${a.x},${a.y}`, `${b.x},${b.y}`].sort(); return `${p}:${m}|${n}`; };
+function roadGroups(p) { // the tribe's cities, grouped by which ones roads join together
+  const n = G.n, seen = Array.from({ length: n }, () => Array(n).fill(false)), groups = [];
+  const passable = (x, y) => { const t = T(x, y); return (t.road && t.t === 'land') || (t.b && t.b.kind === 'city' && t.b.owner === p); };
+  for (const c of cityTiles(p)) {
+    if (seen[c.y][c.x]) continue;
+    const group = [], q = [c]; seen[c.y][c.x] = true;
+    for (let i = 0; i < q.length; i++) {
+      const { x, y } = q[i], t = T(x, y);
+      if (t.b && t.b.kind === 'city' && t.b.owner === p) group.push({ x, y, b: t.b });
+      for (const [dx, dy] of DIRS) {
+        const xx = x + dx, yy = y + dy;
+        if (inb(xx, yy) && !seen[yy][xx] && passable(xx, yy)) { seen[yy][xx] = true; q.push({ x: xx, y: yy }); }
+      }
+    }
+    groups.push(group);
+  }
+  return groups;
+}
+function linkCities(p) {
+  G.links = G.links || {};
+  let made = 0;
+  for (const group of roadGroups(p)) for (let i = 0; i < group.length; i++) for (let j = i + 1; j < group.length; j++) {
+    const a = group[i], b = group[j], k = linkKey(p, a, b);
+    if (G.links[k]) continue;
+    G.links[k] = true; made++;
+    popFx(a.x, a.y, 'Road link!', '#ffe27a'); popFx(b.x, b.y, 'Road link!', '#ffe27a');
+    addPop(a, 1, p); addPop(b, 1, p);
+  }
+  if (made && p === G.view) {
+    toast(made === 1 ? 'A road now links two of your cities: each gains a citizen. 🛤️' : `${made} new road links: every linked city gains a citizen for each link. 🛤️`);
+    sfx('level');
+  }
+  return made;
+}
+const linksOf = (c, p) => Object.keys(G.links || {}).filter(k => k.startsWith(p + ':') && k.slice(k.indexOf(':') + 1).split('|').includes(`${c.x},${c.y}`)).length;
 function addPop(c, amount, p) {
   const b = c.b;
   b.pop += amount;
@@ -745,6 +849,7 @@ function checkElim() {
   }
   const alive = G.players.map((p, i) => i).filter(i => G.players[i].alive);
   if (alive.length === 1) endGame(alive[0], 'domination');
+  else if (alive.every(a => alive.every(b => allied(a, b)))) endGame(alive.slice().sort((a, b) => score(b) - score(a))[0], 'alliance');
   else if (humanCount() === 0) endGame(alive.sort((a, b) => score(b) - score(a))[0], 'domination');
 }
 const TEMPLES = ['temple', 'mtemple', 'ftemple', 'wtemple'];
@@ -781,17 +886,19 @@ function score(p) { // exploration, territory, cities, technology, army, parks a
 function endGame(winner, why) {
   if (G.over) return;
   G.over = { winner, why };
+  if (why === 'alliance') G.over.allies = G.players.map((_, i) => i).filter(i => G.players[i].alive);
   if (net) netSubmit(); else deleteSlot(G.slot || 1); // a finished game frees its slot
   showGameOver();
 }
 function showGameOver() {
   const { winner, why } = G.over, w = G.players[winner];
-  const solo = net ? true : G.players.filter(p => !p.ai).length === 1;
-  const youWon = net ? winner === net.seat : !w.ai;
-  $('go-title').textContent = solo ? (youWon ? '🏆 Victory!' : '💀 Defeat') : `🏆 ${w.name} wins!`;
+  const solo = net ? true : G.players.filter(p => !p.ai).length === 1, team = G.over.allies;
+  const youWon = team ? (net ? team.includes(net.seat) : team.some(i => !G.players[i].ai)) : net ? winner === net.seat : !w.ai;
+  $('go-title').textContent = team && !solo ? '🤝 Alliance victory!' : solo ? (youWon ? (team ? '🤝 Alliance victory!' : '🏆 Victory!') : '💀 Defeat') : `🏆 ${w.name} wins!`;
   const lines = G.players.map((p, i) => ({ p, s: score(i) })).sort((a, b) => b.s - a.s)
     .map(({ p, s }) => `<li><span style="color:${p.color}">●</span> ${esc(p.name)}${p.ai ? '' : ' 👤'} <b>${s}</b>${p.alive ? '' : ' <span class="muted">(fallen)</span>'}</li>`).join('');
-  const what = why === 'perfection' ? `${G.turnLimit} turns are over. Highest score wins.` :
+  const what = why === 'alliance' ? `The alliance of ${team.map(i => G.players[i].name).join(', ').replace(/, ([^,]*)$/, ' and $1')} rules the world after ${G.turn} turns.` :
+    why === 'perfection' ? `${G.turnLimit} turns are over. Highest score wins.` :
     (youWon ? `${w.name} rules the world after ${G.turn} turns.` : `${w.name} has conquered the world.`);
   $('go-text').innerHTML = `${esc(what)}<ol class="scores-list">${lines}</ol>`;
   $('gameover').hidden = false;
@@ -822,8 +929,8 @@ function updateVis() { // units see one tile around them (two from a mountain); 
     const V = G.vis[p];
     for (const row of V) for (let x = 0; x < row.length; x++) if (row[x] === 2) row[x] = 1;
     if (!pl.alive) return;
-    for (const u of G.units) if (u.owner === p) markVis(V, u.x, u.y, T(u.x, u.y).t === 'mountain' ? 2 : 1, p);
-    for (const c of cities) if (c.b.owner === p) markVis(V, c.x, c.y, radiusOf(c.b) + 1 + (c.b.tower ? 2 : 0), p);
+    for (const u of G.units) if (allied(u.owner, p)) markVis(V, u.x, u.y, T(u.x, u.y).t === 'mountain' ? 2 : 1, p); // allies share sight
+    for (const c of cities) if (allied(c.b.owner, p)) markVis(V, c.x, c.y, radiusOf(c.b) + 1 + (c.b.tower ? 2 : 0), p);
   });
   checkLighthouses();
 }
@@ -905,6 +1012,7 @@ function onHumanTurn() {
 
 /* ---------- AI ---------- */
 async function aiTurn(p) {
+  aiDiplomacy(p);
   aiResearch(p);
   aiEconomy(p);
   ui();
@@ -943,6 +1051,27 @@ function aiNeedsSea(p) {
   if (!anyGoal) return false;
   return !G.units.some(u => u.owner === p && field[u.y][u.x] < Infinity) && !cityTiles(p).some(c => field[c.y][c.x] < Infinity);
 }
+function aiRoads(p) {
+  const pl = G.players[p], cities = cityTiles(p);
+  if (!hasTech(p, 'roads') || cities.length < 2 || pl.stars < 4) return;
+  const ok = (x, y) => { const t = T(x, y); return (t.road && t.t === 'land') || (t.b && t.b.kind === 'city' && t.b.owner === p) || roadAllowed(p, x, y); };
+  for (let i = 0; i < cities.length; i++) for (let j = i + 1; j < cities.length; j++) {
+    const a = cities[i], b = cities[j];
+    if ((G.links || {})[linkKey(p, a, b)] || cheb(a, b) > 6) continue;
+    const prev = new Map([[a.x + ',' + a.y, null]]), q = [a];
+    for (let k = 0; k < q.length && !prev.has(b.x + ',' + b.y); k++) for (const [dx, dy] of DIRS) {
+      const x = q[k].x + dx, y = q[k].y + dy, key = x + ',' + y;
+      if (!inb(x, y) || prev.has(key) || !ok(x, y)) continue;
+      prev.set(key, q[k]); q.push({ x, y });
+    }
+    if (!prev.has(b.x + ',' + b.y)) continue;
+    const need = [];
+    for (let c = prev.get(b.x + ',' + b.y); c && c !== a; c = prev.get(c.x + ',' + c.y)) if (!T(c.x, c.y).road && !T(c.x, c.y).b) need.push(c);
+    if (need.length > 5 || need.length * WORKS.road.cost > pl.stars - 2) continue;
+    for (const c of need) doWork(c.x, c.y, 'road', p);
+    return; // one route a turn
+  }
+}
 function aiEconomy(p) {
   const pl = G.players[p], needSea = hasTech(p, 'fishing') && aiNeedsSea(p);
   const weights = { warrior: 2, rider: 2, archer: 2, defender: 1, swordsman: 3, knight: 3, catapult: 1.5, mindbender: 0.6 };
@@ -956,6 +1085,7 @@ function aiEconomy(p) {
     return (pop + gain * 0.3) / Math.max(1, w.cost);
   };
   for (const u of G.units) if (u.owner === p) { if (canPromote(u)) promote(u); const b = nextBoat(u); if (b && pl.stars >= b.cost + 3) upgradeBoat(u); }
+  aiRoads(p);
   for (let guard = 0; guard < 30; guard++) {
     let did = false;
     for (const c of cityTiles(p)) {
@@ -984,7 +1114,7 @@ function aiGoalField(p) {
   const n = G.n, dist = Array.from({ length: n }, () => Array(n).fill(Infinity)), q = [];
   const add = (x, y) => { if (dist[y][x] === Infinity) { dist[y][x] = 0; q.push({ x, y }); } };
   for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (isCapturable(T(x, y), p)) add(x, y);
-  for (const e of G.units) if (e.owner !== p) add(e.x, e.y);
+  for (const e of G.units) if (hostile(e.owner, p)) add(e.x, e.y);
   for (let i = 0; i < q.length; i++) {
     const c = q[i], ct = T(c.x, c.y), cw = isWater(ct), goal = dist[c.y][c.x] === 0;
     for (const [dx, dy] of DIRS) {
@@ -1019,15 +1149,15 @@ function aiPlan(u) {
   let best = null, bs = 0.4;
   for (const s of spots) {
     const isHere = s === here, tl = T(s.x, s.y);
-    if (!isHere && tl.b && (tl.b.kind === 'village' || tl.b.kind === 'ruin' || (tl.b.kind === 'city' && tl.b.owner !== u.owner))) {
+    if (!isHere && tl.b && (tl.b.kind === 'village' || tl.b.kind === 'ruin' || (tl.b.kind === 'city' && hostile(tl.b.owner, u.owner)))) {
       const sc = tl.b.kind === 'village' ? 7 : tl.b.kind === 'ruin' ? 6 : 12 + 2 * tl.b.level; // stand there and take it next turn
       if (sc > bs) { bs = sc; best = { s, target: null }; }
     }
-    if (!isHere && tl.b && tl.b.kind === 'city' && tl.b.owner === u.owner && G.units.some(e => e.owner !== u.owner && cheb(e, s) <= 2) && bs < 3) { bs = 3; best = { s, target: null }; }
+    if (!isHere && tl.b && tl.b.kind === 'city' && tl.b.owner === u.owner && G.units.some(e => hostile(e.owner, u.owner) && cheb(e, s) <= 2) && bs < 3) { bs = 3; best = { s, target: null }; }
     const canHit = isHere ? canAttack(u) : (!u.attacked && has(u, 'dash') && (stats(u).atk > 0 || has(u, 'convert')));
     if (!canHit) continue;
     for (const e of G.units) {
-      if (e.owner === u.owner || cheb(s, e) > R) continue;
+      if (!hostile(e.owner, u.owner) || cheb(s, e) > R) continue;
       const sc = aiTargetScore(u, e, s) - (isHere ? 0 : 0.2);
       if (sc > bs) { bs = sc; best = { s, target: e }; }
     }
@@ -1037,7 +1167,7 @@ function aiPlan(u) {
 function aiRetreat(u) { // step away from the nearest enemy, preferring home ground
   let best = null, bs = -Infinity;
   for (const o of reach(u)) {
-    const d = Math.min(99, ...G.units.filter(e => e.owner !== u.owner).map(e => cheb(e, o)));
+    const d = Math.min(99, ...G.units.filter(e => hostile(e.owner, u.owner)).map(e => cheb(e, o)));
     const s = d + (tileOwner(o.x, o.y) === u.owner ? 0.5 : 0);
     if (s > bs) { bs = s; best = o; }
   }
@@ -1051,7 +1181,7 @@ function aiUnit(u) {
   if (canHeal(u) && G.units.filter(f => f.owner === p && cheb(f, u) <= 1 && f.hp < maxHp(f)).length >= 2) return healOthers(u);
   let acted = false;
   const plan = aiPlan(u);
-  const threatened = G.units.some(e => e.owner !== p && cheb(e, u) <= 2);
+  const threatened = G.units.some(e => hostile(e.owner, p) && cheb(e, u) <= 2);
   if (plan && plan.target) {
     if (plan.s.x !== u.x || plan.s.y !== u.y) doMove(u, plan.s.x, plan.s.y);
     if (G.units.includes(plan.target) && canAttack(u)) attack(u, plan.target);
@@ -1257,7 +1387,7 @@ function renderSheet() {
     const d = UNITS[u.type], st = stats(u), owner = G.players[u.owner];
     title = `<i class="dot" style="background:${owner.color}"></i>${!afloat(u) ? d.name : `${st.name} <small>carrying a ${d.name}</small>`}${u.vet ? ` <small class="vet">★ Veteran · ${PERKS[u.perk || 'hp'].desc}</small>` : ''}`;
     text = `<span class="chips"><span>${STAT_SVG.hp}${u.hp}/${maxHp(u)}</span><span>${STAT_SVG.atk}${st.atk}</span><span>${STAT_SVG.def}${st.def}</span><span>${STAT_SVG.mv}${st.mv}</span><span>${STAT_SVG.rng}${st.range}</span></span>`;
-    const status = u.owner !== me ? esc(owner.name) : u.done || (!canMove(u) && !canAttack(u)) ? 'Done for this turn' : canMove(u) && canAttack(u) ? 'Ready' : canMove(u) ? 'Can still move' : 'Can still attack';
+    const status = u.owner !== me ? esc(owner.name) + (allied(u.owner, me) ? ' · ally 🤝' : '') : u.done || (!canMove(u) && !canAttack(u)) ? 'Done for this turn' : canMove(u) && canAttack(u) ? 'Ready' : canMove(u) ? 'Can still move' : 'Can still attack';
     text += `<span class="status">${status}</span>`;
     if (st.skills.length) text += `<span class="skills">${st.skills.map(k => `<span title="${SKILL_INFO[k]}">${SKILL_INFO[k].split(':')[0]}</span>`).join('')}</span>`;
   } else if (b && b.kind === 'city') {
@@ -1266,8 +1396,8 @@ function renderSheet() {
     if (b.owner === me) {
       const need = b.level >= MAX_LEVEL ? 0 : popNeeded(b), c = { x, y, b };
       const pips = need ? `<span class="pips" title="Population ${b.pop} of ${need}">${Array.from({ length: need }, (_, i) => `<i class="${i < b.pop ? 'on' : ''}"></i>`).join('')}</span>` : '';
-      text = `${pips}<span>+${cityIncome(c, me)} ${STAR_SVG} per turn</span><span>Units ${supported(c, me)}/${b.level + 1}</span>${['wall:City walls', 'tower:Watchtower', 'barracks:Barracks', 'academy:Academy'].filter(e => b[e.split(':')[0]]).map(e => `<span>${e.split(':')[1]}</span>`).join('')}`;
-    } else text = `<span>Stand a unit in the city for a turn, then capture it.</span>`;
+      text = `${pips}<span>+${cityIncome(c, me)} ${STAR_SVG} per turn</span><span>Units ${supported(c, me)}/${b.level + 1}</span><span title="Roads that join two of your cities give each a citizen">🛤️ ${linksOf(c, me)} road link${linksOf(c, me) === 1 ? '' : 's'}</span>${['wall:City walls', 'tower:Watchtower', 'barracks:Barracks', 'academy:Academy'].filter(e => b[e.split(':')[0]]).map(e => `<span>${e.split(':')[1]}</span>`).join('')}`;
+    } else text = allied(b.owner, me) ? '<span>An allied city. 🤝</span>' : `<span>Stand a unit in the city for a turn, then capture it.</span>`;
   } else if (b && b.kind === 'village') { title = 'Village'; text = 'Move a unit here; next turn it can capture the village.'; }
   else if (b && b.kind === 'ruin') { title = 'Ancient Ruins'; text = 'Move a unit here; next turn it can examine them for a reward.'; }
   else if (tl.lighthouse) {
@@ -1428,10 +1558,21 @@ $('tp-research').onclick = () => {
   if (research(G.view, k)) { sfx('tech'); toast(`Discovered ${TECHS[k].icon} ${TECHS[k].name}!`); refreshSel(); ui(); }
 };
 
+function dipCell(i) { // the alliance button beside each rival in the standings
+  const me = G.view, pl = G.players[i];
+  if (i === me) return '<span class="dip you">You</span>';
+  if (!pl.alive || G.over) return '<span class="dip"></span>';
+  if (allied(me, i)) return `<button class="dip ally" data-break="${i}" ${canAct() ? '' : 'disabled'} title="Break the alliance">🤝 Allied</button>`;
+  if ((G.proposals || []).some(q => q.from === me && q.to === i)) return '<span class="dip">Offer sent</span>';
+  if ((G.proposals || []).some(q => q.from === i && q.to === me)) return '<span class="dip">Wants to ally</span>';
+  if (!metList(me).includes(i)) return '<span class="dip muted">Not met</span>';
+  if (offeredThisTurn(me, i)) return '<span class="dip">Refused</span>';
+  return `<button class="dip" data-ally="${i}" ${canAct() ? '' : 'disabled'}>Ally?</button>`;
+}
 function renderGameMenu() {
   $('gm-title').textContent = `${G.mode === 'perfection' ? `Perfection · turn ${G.turn} of ${G.turnLimit}` : `Domination · turn ${G.turn}`} · ${G.diff[0].toUpperCase() + G.diff.slice(1)}`;
   $('gm-tribes').innerHTML = G.players.map((p, i) => ({ p, i, s: score(i) })).sort((a, b) => b.s - a.s).map(({ p, i, s }) =>
-    `<div class="trow ${p.alive ? '' : 'dead'}"><img src="${tribeIcon(p.tribe)}" alt=""><b style="color:${p.color}">${esc(p.name)}${p.ai ? '' : ' 👤'}${net && !p.ai ? ` <small>${esc(net.seats[i] && net.seats[i].taken ? net.seats[i].name || 'Player' : 'open seat')}</small>` : ''}</b><span>${cityTiles(i).length} cities</span><span>${p.techs.length} techs</span><span class="num">${s.toLocaleString('en-US')}</span></div>`).join('');
+    `<div class="trow ${p.alive ? '' : 'dead'}"><img src="${tribeIcon(p.tribe)}" alt=""><b style="color:${p.color}">${esc(p.name)}${p.ai ? '' : ' 👤'}${net && !p.ai ? ` <small>${esc(net.seats[i] && net.seats[i].taken ? net.seats[i].name || 'Player' : 'open seat')}</small>` : ''}</b><span>${cityTiles(i).length} cities</span><span>${p.techs.length} techs</span><span class="num">${s.toLocaleString('en-US')}</span>${dipCell(i)}</div>`).join('');
   $('gm-sound').textContent = muted ? 'Sound: off' : 'Sound: on';
   $('gm-fx').textContent = !postfx.available ? 'Shaders: unavailable' : postfx.on ? 'Shaders: on' : 'Shaders: off';
   $('gm-fx').disabled = !postfx.available;
@@ -1440,13 +1581,26 @@ function renderGameMenu() {
 }
 
 function showReward() {
-  if (!G || G.over || !G.rewards.length || G.cur !== G.view) return;
+  if (!G || G.over || G.cur !== G.view) return;
+  if (!G.rewards.length) { showProposal(); return; }
   const r = G.rewards[0], c = { x: r.x, y: r.y, b: T(r.x, r.y).b };
   if (!c.b || c.b.kind !== 'city' || c.b.owner !== r.owner) { G.rewards.shift(); showReward(); return; }
   showChoice(`${c.b.name} · Level ${r.level}`, 'Choose a reward for your city.', rewardOptions(r.level), key => {
     G.rewards.shift();
     applyReward(c, key, r.owner);
   });
+}
+function showProposal() { // another human asked this player for an alliance
+  const q = (G.proposals || []).find(x => x.to === G.view);
+  if (!q || G.players[G.view].ai) return;
+  if (!G.players[q.from].alive || allied(q.from, q.to)) { G.proposals = G.proposals.filter(x => x !== q); showProposal(); return; }
+  const from = G.players[q.from], who = net && net.seats[q.from] && net.seats[q.from].name ? `${from.name} (${net.seats[q.from].name})` : from.name;
+  showChoice(`${who} offers an alliance`, "Allies can't attack each other or take each other's cities, share what they see, and each earn +1 ⭐ a turn.",
+    [['accept', '🤝', 'Accept', 'Become allies'], ['decline', '✋', 'Decline', 'Stay rivals']], key => {
+      G.proposals = G.proposals.filter(x => x !== q);
+      if (key === 'accept') { setAlliance(q.from, q.to, true); toast(`You are now allied with ${from.name}.`); }
+      else toast(`You declined ${from.name}'s alliance.`);
+    });
 }
 function showPromote(u) {
   showChoice(`Promote ${UNITS[u.type].name}`, 'Three kills! Choose a veteran perk. The unit also heals fully.',
@@ -3412,7 +3566,7 @@ function drawBuildingAt(tl, x, y, cx, cy, now, dim) {
   const pl = G.players[b.owner], tribe = pl.tribe, lv = Math.min(b.level, 8);
   blit(objSprite('city', `city|${tribe}|${lv}|${b.capital ? 1 : 0}|${b.wall ? 1 : 0}`, () => paintCity(tribe, lv, b.capital, b.wall), dim), cx, cy);
   if (b.capital && !dim) { const [fx, fy] = hallFlag(tribe, lv); waveFlag(cx + fx, cy + fy, pl.color, now, tribe); }
-  labels.push({ x: cx, y: cy + 15, text: b.name, capital: b.capital, level: b.level, color: pl.color, pop: b.pop, need: b.level >= MAX_LEVEL ? 0 : popNeeded(b) });
+  labels.push({ x: cx, y: cy + 15, text: b.name, capital: b.capital, level: b.level, color: pl.color, pop: b.pop, need: b.level >= MAX_LEVEL ? 0 : popNeeded(b), ally: b.owner !== G.view && allied(b.owner, G.view) });
 }
 const unitMedium = u => (isWater(T(u.x, u.y)) ? ['boat', 'ship', 'battleship'][u.boat || 0] : 'land');
 const unitSprite = (type, tribe, medium) => getSprite(`unit|${type}|${tribe}|${medium}`, BOX.unit, () => paintUnit(type, tribe, medium));
@@ -3646,6 +3800,7 @@ function drawWorld(now, demoMode) {
     if (l.capital) poly([[x0 + 4, l.y + 3], [x0 + 4, l.y - 2.5], [x0 + 6.6, l.y], [x0 + 9, l.y - 4], [x0 + 11.4, l.y], [x0 + 14, l.y - 2.5], [x0 + 14, l.y + 3]], '#ffcf3f', '#7a5200', 0.8);
     circle(x0 + w - 7, l.y, 5.2, l.color, '#0b1220', 1);
     ctx.fillStyle = '#fff'; ctx.fillText(l.text, l.x - 5 + crown / 2, l.y + 0.5);
+    if (l.ally) { ctx.font = '10px system-ui, sans-serif'; ctx.fillText('🤝', x0 - 8, l.y + 0.5); }
     ctx.font = '800 8px Nunito, system-ui, sans-serif'; ctx.fillStyle = '#0b1220'; ctx.fillText(String(l.level), x0 + w - 7, l.y + 0.5);
     if (l.need) {
       const pw = 5, gap = 1.5, tot = l.need * pw + (l.need - 1) * gap, px = l.x - tot / 2, py = l.y + 9;
@@ -4159,6 +4314,22 @@ $('gm-sound').onclick = () => {
 };
 $('gm-help').onclick = () => { $('help').hidden = false; };
 $('gm-fx').onclick = () => { postfx.toggle(); sfx('click'); renderGameMenu(); };
+let confirmBreak = -1;
+$('gm-tribes').addEventListener('click', e => {
+  const b = e.target.closest('button.dip');
+  if (!b || b.disabled || !canAct()) return;
+  const me = G.view;
+  sfx('click');
+  if (b.dataset.ally !== undefined) {
+    const i = +b.dataset.ally, res = proposeAlliance(me, i), name = G.players[i].name;
+    toast(res === 'accepted' ? `${name} accepts! You are now allies. 🤝` : res === 'sent' ? `Offer sent. ${name} will answer on their turn.` : `${name} refuses your alliance for now.`);
+  } else if (b.dataset.break !== undefined) {
+    const i = +b.dataset.break;
+    if (confirmBreak !== i) { confirmBreak = i; b.textContent = 'Break it?'; return; }
+    confirmBreak = -1; breakAlliance(me, i);
+  }
+  refreshSel(); ui(); renderGameMenu();
+});
 $('gm-main').onclick = () => {
   if (net) { if (G.cur === net.seat && !busy && !G.over) netSubmit(); } else save(); // online: upload the turn so far
   showGame(false);
