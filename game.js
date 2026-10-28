@@ -134,7 +134,16 @@ const T = (x, y) => G.tiles[y][x];
 const unitAt = (x, y) => G.units.find(u => u.x === x && u.y === y);
 const unitById = id => G.units.find(u => u.id === id);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const rndInt = n => Math.floor(Math.random() * n);
+const rndInt = n => Math.floor(Math.random() * n); // for looks only
+// Rules and the computer players draw from a generator stored in the game, so the same state and
+// the same actions always play out the same way on every device.
+function rand() {
+  if (!G || typeof G.rng !== 'number') return Math.random();
+  let t = (G.rng = (G.rng + 0x6D2B79F5) >>> 0);
+  t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+const randInt = n => Math.floor(rand() * n);
 const isWater = tl => tl.t === 'water' || tl.t === 'ocean';
 const hasTech = (p, t) => G.players[p].techs.includes(t);
 const techAvailable = (p, k) => !hasTech(p, k) && (!TECHS[k].req || hasTech(p, TECHS[k].req));
@@ -153,7 +162,7 @@ function mulberry32(a) {
   };
 }
 function cityName(rnd) {
-  rnd = rnd || Math.random;
+  rnd = rnd || rand;
   let s = '';
   const k = 2 + Math.floor(rnd() * 2);
   for (let i = 0; i < k; i++) s += SYL[Math.floor(rnd() * SYL.length)];
@@ -265,7 +274,7 @@ function newGame(cfg) {
 
   const diff = DIFF[cfg.diff] ? cfg.diff : 'normal';
   return {
-    v: 3, n, seed, mode: cfg.mode, turnLimit: 30, diff, mapType: cfg.mapType,
+    v: 3, n, seed, rng: (seed ^ 0x9e3779b9) >>> 0, mode: cfg.mode, turnLimit: 30, diff, mapType: cfg.mapType,
     tiles, units, nextId, turn: 1, cur: 0, view: 0, over: null, rewards: [],
     players: cfg.slots.map((s, i) => {
       const tr = TRIBES[s.tribe];
@@ -528,7 +537,7 @@ function explorerWalk(p, x, y, steps) { // a scout wanders off and maps what it 
     const opts = DIRS.map(([dx, dy]) => [cx + dx, cy + dy]).filter(([a, b]) => inb(a, b) && !isWater(T(a, b)));
     if (!opts.length) break;
     const unseen = opts.filter(([a, b]) => !G.vis[p][b][a]);
-    [cx, cy] = (unseen.length ? unseen : opts)[rndInt((unseen.length ? unseen : opts).length)];
+    [cx, cy] = (unseen.length ? unseen : opts)[randInt((unseen.length ? unseen : opts).length)];
     reveal(p, cx, cy, 1);
   }
 }
@@ -539,10 +548,10 @@ function ruinReward(u, x, y) {
   const spot = DIRS.map(([dx, dy]) => ({ x: x + dx, y: y + dy })).find(s => inb(s.x, s.y) && T(s.x, s.y).t === 'land' && !unitAt(s.x, s.y));
   const cap = cityTiles(p).find(c => c.b.capital) || cityTiles(p)[0];
   const kinds = ['stars', 'tech', 'explorer', 'unit', 'pop'].filter(k => (k !== 'tech' || techs.length) && (k !== 'unit' || spot) && (k !== 'pop' || cap));
-  const kind = kinds[rndInt(kinds.length)];
+  const kind = kinds[randInt(kinds.length)];
   sfxAt('tech', x, y); burst(x, y, 'level');
   if (kind === 'stars') { pl.stars += 10; popFx(x, y, '+10 ⭐', '#ffe27a'); tellOwner(p, 'The ruins held a hidden treasure: +10 ⭐'); }
-  else if (kind === 'tech') { const k = techs[rndInt(techs.length)]; pl.techs.push(k); tellOwner(p, `Ancient scrolls taught you ${TECHS[k].icon} ${TECHS[k].name}!`); }
+  else if (kind === 'tech') { const k = techs[randInt(techs.length)]; pl.techs.push(k); tellOwner(p, `Ancient scrolls taught you ${TECHS[k].icon} ${TECHS[k].name}!`); }
   else if (kind === 'explorer') { explorerWalk(p, x, y, 15); tellOwner(p, 'An explorer joins you and maps the nearby lands.'); }
   else if (kind === 'pop') { addPop(cap, 3, p); tellOwner(p, `Refugees settle in ${cap.b.name}: +3 population.`); }
   else {
@@ -552,9 +561,9 @@ function ruinReward(u, x, y) {
   }
 }
 function aiPickPerk(u) {
-  if (u.type === 'defender' || u.type === 'giant') return Math.random() < 0.6 ? 'def' : 'hp';
+  if (u.type === 'defender' || u.type === 'giant') return rand() < 0.6 ? 'def' : 'hp';
   if (u.type === 'mindbender') return 'hp';
-  const r = Math.random();
+  const r = rand();
   return r < 0.5 ? 'atk' : r < 0.75 ? 'hp' : r < 0.9 ? 'def' : 'mv';
 }
 function credit(k) { k.kills = (k.kills || 0) + 1; if (canPromote(k) && G.players[k.owner].ai) promote(k); }
@@ -695,7 +704,7 @@ function rewardOptions(level) {
   return [['park', '🌳', 'Park', '+1 ⭐ every turn and 250 points'], ['giant', '🗿', 'Super unit', 'A Giant joins you in this city'], ['academy', '🎓', 'Academy', 'Every technology costs 1 ⭐ less']];
 }
 function aiPickReward(level) {
-  const r = Math.random();
+  const r = rand();
   if (level === 2) return r < 0.7 ? 'workshop' : 'militia';
   if (level === 3) return r < 0.45 ? 'wall' : r < 0.9 ? 'resources' : 'tower';
   if (level === 4) return r < 0.4 ? 'border' : r < 0.75 ? 'popgrowth' : 'barracks';
@@ -772,10 +781,13 @@ function score(p) { // exploration, territory, cities, technology, army, parks a
 function endGame(winner, why) {
   if (G.over) return;
   G.over = { winner, why };
-  deleteSlot(G.slot || 1); // a finished game frees its slot
-  const w = G.players[winner];
-  const solo = G.players.filter(p => !p.ai).length === 1;
-  const youWon = !w.ai;
+  if (net) netSubmit(); else deleteSlot(G.slot || 1); // a finished game frees its slot
+  showGameOver();
+}
+function showGameOver() {
+  const { winner, why } = G.over, w = G.players[winner];
+  const solo = net ? true : G.players.filter(p => !p.ai).length === 1;
+  const youWon = net ? winner === net.seat : !w.ai;
   $('go-title').textContent = solo ? (youWon ? '🏆 Victory!' : '💀 Defeat') : `🏆 ${w.name} wins!`;
   const lines = G.players.map((p, i) => ({ p, s: score(i) })).sort((a, b) => b.s - a.s)
     .map(({ p, s }) => `<li><span style="color:${p.color}">●</span> ${esc(p.name)}${p.ai ? '' : ' 👤'} <b>${s}</b>${p.alive ? '' : ' <span class="muted">(fallen)</span>'}</li>`).join('');
@@ -783,7 +795,7 @@ function endGame(winner, why) {
     (youWon ? `${w.name} rules the world after ${G.turn} turns.` : `${w.name} has conquered the world.`);
   $('go-text').innerHTML = `${esc(what)}<ol class="scores-list">${lines}</ol>`;
   $('gameover').hidden = false;
-  sfx(!w.ai ? 'win' : 'lose');
+  sfx(youWon || (!net && !w.ai) ? 'win' : 'lose');
 }
 
 /* ---------- fog of war ---------- */
@@ -876,6 +888,13 @@ async function runTurns(resume) {
   refreshSel(); ui();
 }
 function onHumanTurn() {
+  if (net) { // online: stay on our own seat; upload when the turn has moved on (or to keep progress)
+    G.view = net.seat;
+    updateVis();
+    if (G.cur === net.seat) { focusHome(false); banner(`Your turn · turn ${G.turn}`, `+${income(G.cur)} ⭐ this turn`); showReward(); }
+    netSubmit();
+    return;
+  }
   const p = G.cur, hotseat = G.players.filter(pl => !pl.ai && pl.alive).length > 1;
   G.view = p;
   updateVis();
@@ -906,7 +925,7 @@ function aiResearch(p) {
   const needSea = aiNeedsSea(p);
   let best = null, bs = -Infinity;
   for (const k of avail) {
-    let s = Math.random() * 1.5 - techCost(p, k) * 0.12;
+    let s = rand() * 1.5 - techCost(p, k) * 0.12;
     if (Object.values(UNITS).some(u => u.tech === k)) s += 2;
     for (const w of Object.values(WORKS)) if (w.tech === k && (w.pop || w.gain)) s += 0.7 * mine.filter(tl => w.on(tl)).length;
     if (k === 'climbing') s += 0.3 * mine.filter(tl => tl.t === 'mountain').length;
@@ -915,7 +934,7 @@ function aiResearch(p) {
     if (s > bs) { bs = s; best = k; }
   }
   const cost = techCost(p, best);
-  if (pl.stars >= cost && (unitCount(p) >= unitCap(p) - 1 || pl.stars >= cost + 3 || Math.random() < 0.35)) research(p, best);
+  if (pl.stars >= cost && (unitCount(p) >= unitCap(p) - 1 || pl.stars >= cost + 3 || rand() < 0.35)) research(p, best);
 }
 function aiNeedsSea(p) {
   const field = aiGoalField(p);
@@ -943,7 +962,7 @@ function aiEconomy(p) {
       const free = !unitAt(c.x, c.y), capOk = supported(c, p) < c.b.level + 1;
       const works = availableWorks(c, p).filter(w => WORKS[w.key].cost <= pl.stars && (worth(w) > 0 || (w.key === 'port' && needSea)));
       if (needSea) { const port = works.find(w => w.key === 'port'); if (port) { doWork(port.x, port.y, 'port', p); did = true; continue; } }
-      if (works.length && (!free || !capOk || unitCount(p) >= 2) && Math.random() < 0.65) {
+      if (works.length && (!free || !capOk || unitCount(p) >= 2) && rand() < 0.65) {
         works.sort((a, b) => worth(b) - worth(a));
         doWork(works[0].x, works[0].y, works[0].key, p); did = true; continue;
       }
@@ -951,7 +970,7 @@ function aiEconomy(p) {
         const opts = Object.keys(weights).filter(k => canTrain(c, k, p));
         if (opts.length) {
           const total = opts.reduce((s, k) => s + weights[k], 0);
-          let r = Math.random() * total, pick = opts[0];
+          let r = rand() * total, pick = opts[0];
           for (const k of opts) { r -= weights[k]; if (r <= 0) { pick = k; break; } }
           train(c, pick, p); did = true;
         }
@@ -1047,7 +1066,7 @@ function aiUnit(u) {
     let bestD = field[u.y][u.x], pick = null;
     for (const o of reach(u)) {
       const d = field[o.y][o.x];
-      if (d < bestD || (d === bestD && pick && Math.random() < 0.3)) { bestD = d; pick = o; }
+      if (d < bestD || (d === bestD && pick && rand() < 0.3)) { bestD = d; pick = o; }
     }
     if (pick) { doMove(u, pick.x, pick.y); acted = true; }
     else if (canRecover(u)) return recover(u);
@@ -1066,7 +1085,7 @@ function aiUnit(u) {
 /* ---------- persistence ---------- */
 const slotKey = i => `${SAVE_KEY}-${i}`;
 function save() {
-  if (!G || G.over) return;
+  if (!G || G.over || net) return; // online games live on the server
   G.slot = G.slot || 1; G.savedAt = Date.now();
   try { localStorage.setItem(slotKey(G.slot), JSON.stringify(G)); } catch (e) { /* ignore */ }
 }
@@ -1203,6 +1222,10 @@ function ui() {
   if (busy && gameShown && G.players[G.cur]) {
     const p = G.players[G.cur];
     t.innerHTML = `<i style="background:${p.color}"></i>${esc(p.name)} is playing<span class="dots"></span>`;
+    t.hidden = false;
+  } else if (net && gameShown && !G.over && G.cur !== net.seat && G.players[G.cur]) {
+    const s = net.seats[G.cur], who = s && !s.ai && !s.taken ? 'a player to join' : esc(seatName(net.seats, G.cur));
+    t.innerHTML = `<i style="background:${G.players[G.cur].color}"></i>Waiting for ${who}<span class="dots"></span> · ${net.id}`;
     t.hidden = false;
   } else t.hidden = true;
   const ok = canAct();
@@ -1408,11 +1431,12 @@ $('tp-research').onclick = () => {
 function renderGameMenu() {
   $('gm-title').textContent = `${G.mode === 'perfection' ? `Perfection · turn ${G.turn} of ${G.turnLimit}` : `Domination · turn ${G.turn}`} · ${G.diff[0].toUpperCase() + G.diff.slice(1)}`;
   $('gm-tribes').innerHTML = G.players.map((p, i) => ({ p, i, s: score(i) })).sort((a, b) => b.s - a.s).map(({ p, i, s }) =>
-    `<div class="trow ${p.alive ? '' : 'dead'}"><img src="${tribeIcon(p.tribe)}" alt=""><b style="color:${p.color}">${esc(p.name)}${p.ai ? '' : ' 👤'}</b><span>${cityTiles(i).length} cities</span><span>${p.techs.length} techs</span><span class="num">${s.toLocaleString('en-US')}</span></div>`).join('');
+    `<div class="trow ${p.alive ? '' : 'dead'}"><img src="${tribeIcon(p.tribe)}" alt=""><b style="color:${p.color}">${esc(p.name)}${p.ai ? '' : ' 👤'}${net && !p.ai ? ` <small>${esc(net.seats[i] && net.seats[i].taken ? net.seats[i].name || 'Player' : 'open seat')}</small>` : ''}</b><span>${cityTiles(i).length} cities</span><span>${p.techs.length} techs</span><span class="num">${s.toLocaleString('en-US')}</span></div>`).join('');
   $('gm-sound').textContent = muted ? 'Sound: off' : 'Sound: on';
   $('gm-fx').textContent = !postfx.available ? 'Shaders: unavailable' : postfx.on ? 'Shaders: on' : 'Shaders: off';
   $('gm-fx').disabled = !postfx.available;
-  $('gm-title').textContent += ` · Saved in slot ${G.slot || 1}`;
+  $('gm-title').textContent += net ? ` · Online game ${net.id}` : ` · Saved in slot ${G.slot || 1}`;
+  $('gm-invite').hidden = !net;
 }
 
 function showReward() {
@@ -3906,7 +3930,8 @@ const setup = { tribe: 0, opp: 2, mode: 'domination', diff: 'normal', n: 16, map
   slots: [{ tribe: 0, ai: false }, { tribe: 1, ai: false }] };
 
 function showScreen(name) {
-  for (const s of ['home', 'tribe', 'settings', 'saves']) $('scr-' + s).hidden = s !== name;
+  for (const s of ['home', 'tribe', 'settings', 'saves', 'online']) $('scr-' + s).hidden = s !== name;
+  if (name === 'online') renderOnline();
   if (name === 'home') refreshMenu();
   if (name === 'tribe') renderTribes();
   if (name === 'settings') renderSettings();
@@ -3954,7 +3979,7 @@ function renderSettings() {
           <span class="slot-text"><b>${t.name}</b><small>${t.about} · ${TECHS[t.tech].icon} ${TECHS[t.tech].name}</small></span>
           <span class="chev" aria-hidden="true">›</span>
         </button>
-        <button type="button" class="ctl ${s.ai ? '' : 'human'}" data-i="${i}" ${i === 0 ? 'disabled' : ''}>${s.ai ? 'Computer' : 'Human'}</button>
+        <button type="button" class="ctl ${s.ai ? '' : 'human'}" data-i="${i}" ${i === 0 ? 'disabled' : ''}>${s.ai ? 'Computer' : setup.online ? (i === 0 ? 'You' : 'Online') : 'Human'}</button>
       </div>`; }).join('')}</div>
       <div class="slot-btns"><button type="button" class="btn dark" id="slot-add" ${setup.slots.length >= max ? 'disabled' : ''}>Add player</button>
       <button type="button" class="btn dark" id="slot-remove" ${setup.slots.length <= 2 ? 'disabled' : ''}>Remove player</button></div></div>`;
@@ -3968,15 +3993,18 @@ function renderSettings() {
     <div><span class="set-label">Difficulty</span>${seg('diff', [['easy', 'Easy'], ['normal', 'Normal'], ['hard', 'Hard'], ['crazy', 'Crazy']])}</div>
     <div><span class="set-label">Map size</span>${seg('n', [[12, 'Small'], [16, 'Medium'], [20, 'Large'], [24, 'Huge']])}</div>
     <div><span class="set-label">Map type</span>${seg('map', [['continents', 'Continents'], ['pangea', 'Pangea'], ['archipelago', 'Archipelago']])}</div>`;
-  const saved = [1, 2, 3].map(loadSlot);
-  if (!setup.slot) { // the first free slot, else the one saved longest ago
+  const saved = setup.online ? [] : [1, 2, 3].map(loadSlot);
+  if (setup.online) { /* online games are stored on the server, not in a slot */ }
+  else if (!setup.slot) { // the first free slot, else the one saved longest ago
     const free = saved.findIndex(g => !g);
     setup.slot = free >= 0 ? free + 1 : 1 + saved.reduce((b, g, i) => ((g.savedAt || 0) < (saved[b].savedAt || 0) ? i : b), 0);
   }
   const taken = saved[setup.slot - 1];
-  html += `<div><span class="set-label">Save slot</span>${seg('slot', saved.map((g, i) => [i + 1, `Slot ${i + 1} · ${g ? `Turn ${g.turn}` : 'Empty'}`]))}
+  if (!setup.online) html += `<div><span class="set-label">Save slot</span>${seg('slot', saved.map((g, i) => [i + 1, `Slot ${i + 1} · ${g ? `Turn ${g.turn}` : 'Empty'}`]))}
     ${taken ? `<p class="slot-warn">Starting replaces the game in slot ${setup.slot}: ${esc(slotSummary(taken))}.</p>` : ''}</div>`;
-  $('settings-title').textContent = setup.mp ? 'Pass & Play' : `${TRIBES[setup.tribe].name} · Game settings`;
+  $('settings-title').textContent = setup.online ? 'Online game' : setup.mp ? 'Pass & Play' : `${TRIBES[setup.tribe].name} · Game settings`;
+  $('btn-start').textContent = setup.online ? 'Create Game' : 'Start Game';
+  $('settings-error').textContent = '';
   $('settings').innerHTML = html;
 }
 $('settings').addEventListener('click', e => {
@@ -4000,6 +4028,7 @@ $('settings').addEventListener('click', e => {
 });
 
 function startGame(cfg) {
+  netLeave();
   const s = newGame(cfg);
   s.slot = cfg.slot || 1;
   G = s; startTurn(0);
@@ -4007,6 +4036,15 @@ function startGame(cfg) {
   save();
 }
 $('btn-start').onclick = () => {
+  if (setup.online) {
+    const cfg = { slots: setup.slots.map(s => ({ ...s })), n: setup.n, mapType: setup.map, mode: setup.mode, diff: setup.diff, seed: (Math.random() * 2 ** 31) | 0 };
+    $('btn-start').disabled = true; $('settings-error').textContent = 'Creating the game…'; sfx('click');
+    netCreate(cfg, store.get(NET_NAME, 'Player'))
+      .then(() => { $('settings-error').textContent = ''; begin(G, false); showShare(); })
+      .catch(e => { $('settings-error').textContent = `Could not create the game: ${e.message}`; })
+      .finally(() => { $('btn-start').disabled = false; });
+    return;
+  }
   let slots;
   if (setup.mp) slots = setup.slots.map(s => ({ ...s }));
   else {
@@ -4042,8 +4080,19 @@ function begin(state, resumed) {
     }
   }
   if (!CORNERS(G.n).some(([x, y]) => T(x, y).lighthouse)) placeLighthouses(G.tiles, G.n);
+  if (typeof G.rng !== 'number') G.rng = ((G.seed || 1) ^ 0x9e3779b9) >>> 0; // saves from before the seeded generator
   rescueUnits();
   ['gameover', 'reward', 'pass', 'tech', 'tech-pop', 'help', 'game-menu'].forEach(id => { $(id).hidden = true; });
+  if (net) { // an online game: we always see it from our own seat
+    G.view = net.seat;
+    updateVis(); focusHome(true); showGame(true);
+    const z = W < 700 ? 0.8 : 1.05;
+    cam.z = z * 0.55; camGoal = { x: cam.x, y: cam.y, z };
+    if (!G.over && G.cur === net.seat) banner(`Your turn · turn ${G.turn}`, `+${income(G.cur)} ⭐ this turn`);
+    else if (!G.over) banner(`Online game ${net.id}`, 'You will be told when it is your turn');
+    netAfterLoad(false);
+    return;
+  }
   if (G.players[G.cur].ai) { // restored mid-way through the computer's turn
     updateVis(); focusHome(true); cam.z = W < 700 ? 0.8 : 1.05; showGame(true);
     runTurns(true);
@@ -4060,8 +4109,8 @@ function begin(state, resumed) {
   }
 }
 
-$('btn-new').onclick = () => { setup.mp = false; setup.slot = 0; sfx('click'); showScreen('tribe'); };
-$('btn-mp').onclick = () => { setup.mp = true; setup.slot = 0; sfx('click'); showScreen('settings'); };
+$('btn-new').onclick = () => { setup.mp = false; setup.online = false; setup.slot = 0; sfx('click'); showScreen('tribe'); };
+$('btn-mp').onclick = () => { setup.mp = true; setup.online = false; setup.slot = 0; sfx('click'); showScreen('settings'); };
 $('btn-saves').onclick = () => { sfx('click'); showScreen('saves'); };
 $('btn-saves-back').onclick = () => showScreen('home');
 let confirmDelete = 0;
@@ -4085,7 +4134,7 @@ $('save-list').addEventListener('click', e => {
   if (b.dataset.load) {
     const i = +b.dataset.load, g = loadSlot(i);
     confirmDelete = 0;
-    if (g) { g.slot = i; begin(g, true); }
+    if (g) { netLeave(); g.slot = i; begin(g, true); }
   } else if (b.dataset.del) {
     const i = +b.dataset.del;
     if (confirmDelete === i) {
@@ -4096,8 +4145,8 @@ $('save-list').addEventListener('click', e => {
   }
 });
 $('btn-tribe-back').onclick = () => { if (setup.mp && setup.pickSlot != null) { setup.pickSlot = null; showScreen('settings'); } else showScreen('home'); };
-$('btn-settings-back').onclick = () => showScreen(setup.mp ? 'home' : 'tribe');
-$('btn-continue').onclick = () => { const s = loadSave(); if (s) begin(s, true); };
+$('btn-settings-back').onclick = () => showScreen(setup.online ? 'online' : setup.mp ? 'home' : 'tribe');
+$('btn-continue').onclick = () => { const s = loadSave(); if (s) { netLeave(); begin(s, true); } };
 $('btn-resume').onclick = () => showGame(true);
 $('btn-howto').onclick = () => { $('help').hidden = false; };
 $('btn-game').onclick = () => { if (!G) return; sfx('click'); renderGameMenu(); $('game-menu').hidden = false; };
@@ -4110,7 +4159,10 @@ $('gm-sound').onclick = () => {
 };
 $('gm-help').onclick = () => { $('help').hidden = false; };
 $('gm-fx').onclick = () => { postfx.toggle(); sfx('click'); renderGameMenu(); };
-$('gm-main').onclick = () => { save(); showGame(false); };
+$('gm-main').onclick = () => {
+  if (net) { if (G.cur === net.seat && !busy && !G.over) netSubmit(); } else save(); // online: upload the turn so far
+  showGame(false);
+};
 $('btn-end').onclick = endTurn;
 $('actions').addEventListener('wheel', e => { // a mouse wheel scrolls the action row sideways
   const el = $('actions');
@@ -4139,9 +4191,253 @@ function refreshMenu() {
   $('btn-resume').hidden = !(G && !G.over);
 }
 
+/* ---------- online play ---------- */
+// Turn-by-turn games between devices, stored in a Supabase project (see supabase/schema.sql and config.js).
+// The device whose turn it is plays it, runs any computer players that follow, then uploads the whole state.
+// Everyone else checks for a new version every few seconds while they wait.
+const NET = window.POLYWEB_ONLINE || {};
+const netReady = () => !!(NET.url && NET.anonKey);
+const NET_GAMES = 'polyweb-online-games', NET_NAME = 'polyweb-name', CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+let net = null; // the online game on screen: { id, seat, key, version, seats }
+let netTimer = 0, netQueue = Promise.resolve(), netNotified = false;
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* ignore */ } },
+  del(k) { try { localStorage.removeItem(k); } catch (e) { /* ignore */ } },
+};
+const netGames = () => store.get(NET_GAMES, []);
+function netRemember(entry) { store.set(NET_GAMES, [entry, ...netGames().filter(e => e.id !== entry.id)].slice(0, 30)); }
+function netForget(id) { store.set(NET_GAMES, netGames().filter(e => e.id !== id)); store.del('polyweb-pending-' + id); }
+function randomKey() { const a = new Uint8Array(16); crypto.getRandomValues(a); return [...a].map(b => b.toString(16).padStart(2, '0')).join(''); }
+function randomCode() { const a = new Uint8Array(6); crypto.getRandomValues(a); return [...a].map(b => CODE_CHARS[b % CODE_CHARS.length]).join(''); }
+const inviteLink = id => `${location.origin}${location.pathname}?join=${id}`;
+const seatName = (seats, i) => (seats && seats[i] && seats[i].name) || TRIBES[(seats && seats[i] ? seats[i].tribe : 0)].name;
+async function rpc(fn, args) {
+  const headers = { apikey: NET.anonKey, 'Content-Type': 'application/json' };
+  if (/^eyJ/.test(NET.anonKey)) headers.Authorization = `Bearer ${NET.anonKey}`; // legacy anon keys are JWTs; publishable keys go in apikey only
+  const res = await fetch(`${NET.url.replace(/\/+$/, '')}/rest/v1/rpc/${fn}`, { method: 'POST', headers, body: JSON.stringify(args) });
+  const body = await res.json().catch(() => null);
+  if (!res.ok) { const err = new Error((body && (body.message || body.error || body.hint)) || `Server error ${res.status}`); err.server = true; throw err; }
+  return body;
+}
+function netLeave() { net = null; clearTimeout(netTimer); document.title = 'Polyweb'; }
+
+// Creating, joining and opening games
+async function netCreate(cfg, name) {
+  const s = newGame(cfg), prevG = G, prevNet = net;
+  s.slot = null;
+  G = s; startTurn(0);
+  const seats = cfg.slots.map(sl => ({ tribe: sl.tribe, ai: !!sl.ai })), key = randomKey();
+  for (let tries = 0; ; tries++) {
+    const id = randomCode();
+    try {
+      await rpc('create_game', { p_id: id, p_state: G, p_seats: seats, p_key: key, p_name: name });
+      seats[0] = { ...seats[0], name, taken: true };
+      netLeave();
+      net = { id, seat: 0, key, version: 1, seats };
+      netRemember({ id, seat: 0, key });
+      return id;
+    } catch (e) { if (!/duplicate|unique/i.test(e.message) || tries >= 4) { G = prevG; net = prevNet; throw e; } }
+  }
+}
+async function netJoin(id, seat, name) {
+  const key = randomKey();
+  await rpc('join_game', { p_id: id, p_seat: seat, p_key: key, p_name: name });
+  netRemember({ id, seat, key });
+}
+async function netOpen(id) {
+  const mine = netGames().find(e => e.id === id);
+  if (!mine) throw new Error('This device has no seat in that game.');
+  const g = await rpc('get_game', { p_id: id });
+  if (!g) throw new Error('That game no longer exists.');
+  netLeave();
+  net = { id, seat: mine.seat, key: mine.key, version: g.version, seats: g.seats };
+  let state = g.state;
+  const pending = store.get('polyweb-pending-' + id, null); // a turn that never reached the server
+  if (pending && pending.version === g.version && g.cur === mine.seat) state = pending.state;
+  else store.del('polyweb-pending-' + id);
+  begin(state, true);
+  if (state === (pending && pending.state)) netSubmit();
+}
+
+// Sending turns
+function netSubmit() { netQueue = netQueue.then(netSend, netSend); return netQueue; }
+async function netSend() {
+  if (!net || !G) return;
+  const id = net.id, version = net.version, state = JSON.parse(JSON.stringify(G));
+  store.set('polyweb-pending-' + id, { version, state });
+  try {
+    const nv = await rpc('submit_turn', { p_id: id, p_version: version, p_key: net.key, p_state: state });
+    store.del('polyweb-pending-' + id);
+    if (net && net.id === id) net.version = nv;
+  } catch (e) {
+    if (!net || net.id !== id) return;
+    if (e.server && /version conflict|not your turn|game over/.test(e.message)) {
+      store.del('polyweb-pending-' + id);
+      toast('This game moved on elsewhere. Loading the latest turn.');
+      await netRefresh().catch(() => {});
+    } else {
+      toast('Could not reach the server. Your turn is kept on this device and will be sent again.');
+      setTimeout(() => { if (net && net.id === id) netSubmit(); }, 6000);
+    }
+  }
+  netSchedule();
+}
+
+// Waiting for the others
+function netSchedule() {
+  clearTimeout(netTimer);
+  if (net) netTimer = setTimeout(netPoll, document.hidden ? 20000 : 4000);
+}
+async function netPoll() {
+  if (!net) return;
+  try {
+    const waiting = G && !G.over && G.cur !== net.seat && !busy;
+    const [sum] = await rpc('game_summaries', { p_ids: [net.id] });
+    if (sum && net) {
+      net.seats = sum.seats;
+      if (waiting && sum.version !== net.version) await netRefresh();
+      else ui();
+    }
+  } catch (e) { /* offline for a moment: try again later */ }
+  netSchedule();
+}
+async function netRefresh() {
+  const id = net.id, g = await rpc('get_game', { p_id: id });
+  if (!g || !net || net.id !== id) return;
+  net.version = g.version; net.seats = g.seats;
+  const wasMine = G && G.cur === net.seat;
+  G = g.state; busy = false; sel = null; selMoves = []; selTargets = []; anims.clear(); hitAnims.clear(); spawns.clear();
+  G.view = net.seat;
+  ['reward', 'pass', 'tech-pop'].forEach(k => { $(k).hidden = true; });
+  updateVis(); ui();
+  netAfterLoad(!wasMine);
+}
+function netAfterLoad(arrived) { // what to show once an online state is on screen
+  if (G.over) { showGameOver(); return; }
+  if (G.cur === net.seat) {
+    if (arrived) {
+      focusHome(false);
+      banner(`Your turn · turn ${G.turn}`, `+${income(net.seat)} ⭐ this turn`);
+      sfx('level'); netAlert();
+    }
+    showReward();
+  }
+  netSchedule();
+}
+function netAlert() { // tell a player in another tab or app that it is their turn
+  if (!document.hidden) return;
+  document.title = '● Your turn · Polyweb';
+  try { if (window.Notification && Notification.permission === 'granted') new Notification('Polyweb', { body: `Your turn in game ${net.id}`, tag: 'polyweb-' + net.id }); } catch (e) { /* ignore */ }
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { document.title = 'Polyweb'; if (net) netPoll(); } });
+function askNotify() { try { if (window.Notification && Notification.permission === 'default') Notification.requestPermission(); } catch (e) { /* ignore */ } }
+
+// The Online Play screen
+function renderOnline() {
+  const ready = netReady();
+  $('online-setup').hidden = ready;
+  $('online-main').hidden = !ready;
+  if (!ready) return;
+  $('online-name').value = store.get(NET_NAME, '');
+  const list = netGames();
+  $('online-list').innerHTML = list.length ? list.map(e => `<div class="save-card online-card" data-id="${e.id}"><div class="save-text"><b>${e.id}</b><span class="muted">Loading…</span></div>
+    <div class="save-btns"><button class="btn green" data-open="${e.id}">Open</button><button class="btn dark" data-forget="${e.id}">Forget</button></div></div>`).join('')
+    : '<p class="muted">No online games on this device yet. Create one, or join with a code from a friend.</p>';
+  if (!list.length) return;
+  rpc('game_summaries', { p_ids: list.map(e => e.id) }).then(rows => {
+    for (const e of list) {
+      const card = document.querySelector(`.online-card[data-id="${e.id}"]`), r = rows.find(x => x.id === e.id);
+      if (!card) continue;
+      const seat = r && r.seats[e.seat], tribe = seat ? TRIBES[seat.tribe] : null;
+      const status = !r ? 'This game no longer exists.' : r.status === 'over' ? (r.winner === e.seat ? '🏆 You won' : `Finished · ${esc(seatName(r.seats, r.winner))} won`)
+        : r.cur === e.seat ? '<b class="your-turn">Your turn</b>' : r.seats[r.cur] && !r.seats[r.cur].ai && !r.seats[r.cur].taken ? 'Waiting for a player to join' : `Waiting for ${esc(seatName(r.seats, r.cur))}`;
+      card.style.setProperty('--c', tribe ? tribe.color : '#2a4269');
+      card.querySelector('.save-text').innerHTML = `<b>${e.id}${tribe ? ` · <span style="color:${tribe.color}">${tribe.name}</span>` : ''}</b><span>${status}</span><span class="muted">${r ? `Turn ${r.turn} · ${r.seats.filter(s => !s.ai).map((s, i) => esc(s.taken ? s.name || 'Player' : 'open seat')).join(', ')}` : ''}</span>`;
+      if (!r) card.querySelector('[data-open]').disabled = true;
+    }
+  }).catch(err => { $('online-error').textContent = `Could not reach the server: ${err.message}`; });
+}
+function onlineName() {
+  const n = $('online-name').value.trim().slice(0, 24) || 'Player';
+  store.set(NET_NAME, n);
+  return n;
+}
+async function showSeats(id) { // pick a free seat in a friend's game
+  $('online-error').textContent = '';
+  const g = await rpc('get_game', { p_id: id }).catch(e => { $('online-error').textContent = e.message; return undefined; });
+  if (g === undefined) return;
+  if (!g) { $('online-error').textContent = `No game with the code ${id}.`; return; }
+  if (netGames().some(e => e.id === id)) { await netOpen(id); return; }
+  $('seat-title').textContent = `Join game ${id}`;
+  $('seat-list').innerHTML = g.seats.map((s, i) => {
+    const t = TRIBES[s.tribe], free = !s.ai && !s.taken;
+    return `<button class="slot-tribe seat" data-seat="${i}" style="--c:${t.color}" ${free ? '' : 'disabled'}>
+      <img src="${tribeIcon(s.tribe)}" alt=""><span class="slot-text"><b>${t.name}</b><small>${s.ai ? 'Computer' : s.taken ? esc(s.name || 'Player') : 'Free seat · tap to join'}</small></span><span class="chev">${free ? '›' : ''}</span></button>`;
+  }).join('');
+  $('seat-pick').dataset.id = id;
+  $('seat-pick').hidden = false;
+}
+async function netGuard(fn) { // run an online action with a busy state and a readable error
+  $('online-error').textContent = '';
+  document.body.classList.add('net-busy');
+  try { await fn(); } catch (e) { $('online-error').textContent = e.message; } finally { document.body.classList.remove('net-busy'); }
+}
+$('btn-online').onclick = () => { sfx('click'); showScreen('online'); };
+$('btn-online-back').onclick = () => showScreen('home');
+$('btn-online-create').onclick = () => {
+  onlineName(); askNotify(); sfx('click');
+  setup.mp = true; setup.online = true; setup.pickSlot = null;
+  setup.slots = [{ tribe: setup.slots[0] ? setup.slots[0].tribe : 0, ai: false }, { tribe: 1, ai: false }];
+  showScreen('settings');
+};
+$('btn-join').onclick = () => {
+  const code = $('join-code').value.trim().toUpperCase();
+  if (!/^[A-Z0-9]{6}$/.test(code)) { $('online-error').textContent = 'Game codes have 6 letters and numbers.'; return; }
+  onlineName(); askNotify(); sfx('click');
+  netGuard(() => showSeats(code));
+};
+$('join-code').addEventListener('keydown', e => { if (e.key === 'Enter') $('btn-join').click(); });
+$('online-list').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  sfx('click');
+  if (b.dataset.open) netGuard(() => netOpen(b.dataset.open));
+  else if (b.dataset.forget) { netForget(b.dataset.forget); renderOnline(); }
+});
+$('seat-list').addEventListener('click', e => {
+  const b = e.target.closest('[data-seat]');
+  if (!b || b.disabled) return;
+  const id = $('seat-pick').dataset.id, seat = +b.dataset.seat;
+  sfx('click');
+  netGuard(async () => { await netJoin(id, seat, onlineName()); $('seat-pick').hidden = true; await netOpen(id); });
+});
+$('btn-seat-cancel').onclick = () => { $('seat-pick').hidden = true; };
+$('btn-share-copy').onclick = async () => {
+  const link = inviteLink(net ? net.id : '');
+  try { await navigator.clipboard.writeText(link); $('btn-share-copy').textContent = 'Copied!'; }
+  catch (e) { $('share-link').select(); $('btn-share-copy').textContent = 'Select and copy the link'; }
+};
+$('btn-share-close').onclick = () => { $('net-share').hidden = true; };
+function showShare() {
+  $('share-code').textContent = net.id;
+  $('share-link').value = inviteLink(net.id);
+  $('btn-share-copy').textContent = 'Copy invite link';
+  $('net-share').hidden = false;
+}
+$('gm-invite').onclick = () => { $('game-menu').hidden = true; showShare(); };
+
 /* ---------- boot ---------- */
 resize(); showScreen('home'); requestAnimationFrame(draw);
 // Keep a game in progress when this page is hot-reloaded inside an artifact viewer.
 window.claude?.hot?.snapshot?.(() => (G && !G.over ? { G } : {}));
 function start(data) { if (data && data.G && data.G.v === 3) begin(data.G, true); }
 if (window.claude?.hot?.ready) window.claude.hot.ready(start); else start(window.claude?.hot?.data ?? {});
+// an invite link (?join=CODE) opens the Online Play screen ready to join
+{
+  const code = new URLSearchParams(location.search).get('join');
+  if (code && netReady() && !G) {
+    history.replaceState(null, '', location.pathname);
+    showScreen('online'); $('join-code').value = code.toUpperCase().slice(0, 6); $('btn-join').click();
+  }
+}
