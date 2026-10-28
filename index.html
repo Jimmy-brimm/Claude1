@@ -63,7 +63,7 @@
   </section>
 
   <section class="screen" id="scr-tribe" hidden>
-    <h2 class="screen-title">Choose your tribe</h2>
+    <h2 class="screen-title" id="tribe-title">Choose your tribe</h2>
     <div id="tribe-grid"></div>
     <div class="row center"><button class="btn dark" id="btn-tribe-back">Back</button></div>
   </section>
@@ -112,6 +112,7 @@
     <div class="stack">
       <button class="btn green" id="gm-resume">Resume</button>
       <button class="btn blue" id="gm-sound">Sound: on</button>
+      <button class="btn blue" id="gm-fx">Shaders: on</button>
       <button class="btn blue" id="gm-help">How to Play</button>
       <button class="btn dark" id="gm-main">Main Menu</button>
     </div>
@@ -149,8 +150,10 @@
       <li><b>Technology</b> costs more with every city you own. Climbing opens mountains, Fishing builds ports to board boats, Sailing crosses the ocean and makes Ships, Navigation makes Battleships, Roads halve movement. A fourth ring of ten advanced technologies goes beyond the classic tree.</li>
       <li><b>Movement.</b> Forests and mountains stop a unit, and so does stepping next to an enemy. Units board boats only at their own ports.</li>
       <li><b>Combat.</b> Damage depends on attack, defence and health. Defenders get ×1.5 in forests (Archery), on mountains (Climbing), in water (Aquatism) and in cities, and ×4 behind city walls. Units that skip moving and attacking can <i>Recover</i>: +4 health in your borders, +2 outside. Three kills unlock <i>Promote</i>: choose +5 health, +1 attack, +1 defence or +1 movement.</li>
+      <li><b>Roads</b> can be built on any land in your territory, with or without a unit there, and on unclaimed land where your unit stands.</li>
+      <li><b>Lighthouses</b> stand in the four corners of the world. The first time you sight each one you earn 3 ⭐ and 100 points.</li>
       <li><b>Saving.</b> There are three save slots. Pick one when you start a game; it saves after every turn. Load or delete games under Saved Games.</li>
-      <li><b>Controls.</b> Drag to pan, scroll or pinch to zoom. <kbd>E</kbd> end turn, <kbd>N</kbd> next unit, <kbd>T</kbd> tech tree, <kbd>Esc</kbd> close or deselect.</li>
+      <li><b>Controls.</b> Drag to pan, scroll or pinch to zoom. <kbd>E</kbd> end turn, <kbd>N</kbd> next unit, <kbd>T</kbd> tech tree, <kbd>Esc</kbd> close or deselect. Shaders can be switched off in the Game menu.</li>
     </ul>
     <div class="row center"><button class="btn green" id="btn-help-close">Got it</button></div>
   </div>

@@ -14,6 +14,7 @@
 html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--text);
   font:15px/1.45 var(--font-body);-webkit-user-select:none;user-select:none}
 canvas{position:fixed;inset:0;width:100%;height:100%;touch-action:none;display:block}
+#glc{pointer-events:none}
 [hidden]{display:none!important}
 button,select{font:inherit;color:var(--text)}
 button{cursor:pointer}
@@ -141,10 +142,11 @@ kbd{background:#0006;border:1px solid var(--line);border-radius:4px;padding:0 5p
   text-shadow:0 4px 0 #1f6fb0,0 8px 0 #0c3a63,0 14px 26px rgba(0,0,0,.5)}
 .tag{margin:0 0 4px;font-weight:800;color:#e3ecf8;text-shadow:0 2px 0 rgba(0,0,0,.6)}
 .screen-title{margin:0 0 6px;font:400 32px var(--font-display);letter-spacing:.6px;text-shadow:0 3px 0 rgba(0,0,0,.5)}
-#tribe-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;width:100%}
+#tribe-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;width:100%}
+#scr-tribe{width:min(980px,100%)}
 .tribe-card{display:grid;justify-items:center;gap:2px;padding:12px 10px 14px;border-radius:18px;border:0;background:var(--panel);
   box-shadow:0 4px 0 #0a1626,0 10px 24px rgba(0,0,0,.35);text-align:center;border-top:6px solid var(--c);transition:transform .1s}
-.tribe-card img{width:110px;height:110px}
+.tribe-card img{width:96px;height:96px}
 .tribe-card b{font:400 22px var(--font-display);letter-spacing:.5px;color:var(--c)}
 .tribe-card .muted{font-size:13px}
 .tribe-card .tech{font-weight:800;font-size:13px}
@@ -174,9 +176,18 @@ kbd{background:#0006;border:1px solid var(--line);border-radius:4px;padding:0 5p
 .mode-cards button.on{background:var(--blue);box-shadow:0 4px 0 var(--blue-edge)}
 .mode-cards button.on span{color:#e8f4ff}
 #slots{display:grid;gap:8px}
-.slot{display:grid;grid-template-columns:44px 1fr auto;gap:10px;align-items:center}
-.slot img{width:44px;height:44px}
-.slot select{width:100%;min-width:0;background:var(--dark);border:0;border-radius:10px;padding:9px 10px;font-weight:800}
+.slot{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}
+.slot-tribe{display:grid;grid-template-columns:52px 1fr auto;align-items:center;gap:10px;min-width:0;text-align:left;border:0;border-radius:14px;padding:6px 12px 6px 6px;
+  background:var(--dark);box-shadow:0 3px 0 var(--dark-edge),inset 4px 0 0 var(--c)}
+.slot-tribe:hover{background:#34507a}
+.slot-tribe img{width:52px;height:52px}
+.slot-text{display:grid;gap:1px;min-width:0}
+.slot-text b{font:400 18px var(--font-display);letter-spacing:.3px;color:var(--c)}
+.slot-text small{font-size:12.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.slot-tribe .chev{font:400 24px var(--font-display);color:var(--muted)}
+.tribe-card{position:relative}
+.tribe-card .taken{position:absolute;top:8px;right:8px;font:800 11px var(--font-body);background:rgba(0,0,0,.45);border-radius:999px;padding:2px 8px}
+.tribe-card.current{outline:3px solid var(--c);outline-offset:-3px}
 .slot .ctl{border:0;border-radius:10px;padding:9px 12px;background:var(--dark);box-shadow:0 3px 0 var(--dark-edge);font:400 14px var(--font-display);min-width:104px}
 .slot .ctl.human{background:var(--green);box-shadow:0 3px 0 var(--green-edge)}
 .slot .ctl:disabled{cursor:default}
@@ -235,6 +246,7 @@ kbd{background:#0006;border:1px solid var(--line);border-radius:4px;padding:0 5p
 #pass-img{display:block;margin:0 auto 4px}
 .scores-list{margin:12px 0 0;padding-left:22px;display:grid;gap:4px;color:var(--text);text-align:left;font-variant-numeric:tabular-nums}
 
+@media (max-width:900px){#tribe-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media (max-width:640px){
   #tribe-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .tribe-card img{width:86px;height:86px}
