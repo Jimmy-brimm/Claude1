@@ -47,6 +47,23 @@
   </div>
 </div>
 
+<!-- Map editor toolbar -->
+<div id="editor-bar" hidden>
+  <div id="ed-tools"></div>
+  <div class="ed-row">
+    <div class="seg" id="ed-brush"></div>
+    <select id="ed-biome" aria-label="Biome"></select>
+    <button class="btn dark" id="ed-random">Random terrain</button>
+  </div>
+  <div class="ed-row">
+    <input id="ed-name" maxlength="30" aria-label="Map name">
+    <span id="ed-info" class="muted"></span>
+    <button class="btn blue" id="ed-save">Save</button>
+    <button class="btn green" id="ed-play">Play this map</button>
+    <button class="btn dark" id="ed-exit">Exit</button>
+  </div>
+</div>
+
 <!-- Start screens -->
 <div id="menu" class="overlay">
   <section class="screen" id="scr-home">
@@ -59,6 +76,7 @@
       <button class="btn blue" id="btn-new">New Game</button>
       <button class="btn blue" id="btn-mp">Pass &amp; Play</button>
       <button class="btn blue" id="btn-online">Online Play</button>
+      <button class="btn blue" id="btn-maps">Map Editor</button>
       <button class="btn dark" id="btn-howto">How to Play</button>
     </div>
     <p class="build muted">Version <span id="build">dev</span></p>
@@ -94,6 +112,20 @@
       <div id="online-list"></div>
     </div>
     <div class="row center"><button class="btn dark" id="btn-online-back">Back</button></div>
+  </section>
+
+  <section class="screen" id="scr-maps" hidden>
+    <h2 class="screen-title">Map Editor</h2>
+    <div class="online-box">
+      <span class="set-label">Your maps</span>
+      <div id="maps-list"></div>
+      <span class="set-label">New map</span>
+      <input id="new-name" maxlength="30" placeholder="Map name" aria-label="Map name">
+      <div class="size-row"><input type="range" id="new-size" min="10" max="64" step="1" value="20" aria-label="Map size"><b id="new-size-val">20×20</b></div>
+      <div class="seg" id="new-base"><button type="button" data-v="random" class="on">Random terrain</button><button type="button" data-v="water">All sea</button><button type="button" data-v="land">All land</button></div>
+      <button class="btn green" id="btn-new-map">Create &amp; edit</button>
+    </div>
+    <div class="row center"><button class="btn dark" id="btn-maps-back">Back</button></div>
   </section>
 
   <section class="screen" id="scr-settings" hidden>
