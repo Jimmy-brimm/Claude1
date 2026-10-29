@@ -47,6 +47,23 @@
   </div>
 </div>
 
+<!-- Map editor toolbar -->
+<div id="editor-bar" hidden>
+  <div id="ed-tools"></div>
+  <div class="ed-row">
+    <div class="seg" id="ed-brush"></div>
+    <select id="ed-biome" aria-label="Biome"></select>
+    <button class="btn dark" id="ed-random">Random terrain</button>
+  </div>
+  <div class="ed-row">
+    <input id="ed-name" maxlength="30" aria-label="Map name">
+    <span id="ed-info" class="muted"></span>
+    <button class="btn blue" id="ed-save">Save</button>
+    <button class="btn green" id="ed-play">Play this map</button>
+    <button class="btn dark" id="ed-exit">Exit</button>
+  </div>
+</div>
+
 <!-- Start screens -->
 <div id="menu" class="overlay">
   <section class="screen" id="scr-home">
@@ -59,6 +76,7 @@
       <button class="btn blue" id="btn-new">New Game</button>
       <button class="btn blue" id="btn-mp">Pass &amp; Play</button>
       <button class="btn blue" id="btn-online">Online Play</button>
+      <button class="btn blue" id="btn-maps">Map Editor</button>
       <button class="btn dark" id="btn-howto">How to Play</button>
     </div>
     <p class="build muted">Version <span id="build">dev</span></p>
@@ -94,6 +112,20 @@
       <div id="online-list"></div>
     </div>
     <div class="row center"><button class="btn dark" id="btn-online-back">Back</button></div>
+  </section>
+
+  <section class="screen" id="scr-maps" hidden>
+    <h2 class="screen-title">Map Editor</h2>
+    <div class="online-box">
+      <span class="set-label">Your maps</span>
+      <div id="maps-list"></div>
+      <span class="set-label">New map</span>
+      <input id="new-name" maxlength="30" placeholder="Map name" aria-label="Map name">
+      <div class="size-row"><input type="range" id="new-size" min="10" max="64" step="1" value="20" aria-label="Map size"><b id="new-size-val">20×20</b></div>
+      <div class="seg" id="new-base"><button type="button" data-v="random" class="on">Random terrain</button><button type="button" data-v="water">All sea</button><button type="button" data-v="land">All land</button></div>
+      <button class="btn green" id="btn-new-map">Create &amp; edit</button>
+    </div>
+    <div class="row center"><button class="btn dark" id="btn-maps-back">Back</button></div>
   </section>
 
   <section class="screen" id="scr-settings" hidden>
@@ -198,6 +230,8 @@
       <li><b>Alliances.</b> Open the Game menu and press <i>Ally?</i> beside a tribe you have met. Computer tribes answer at once; human players answer on their turn. Allies can't attack each other or take each other's cities, don't block each other's movement, share vision and each earn +1 ⭐ a turn. If every tribe left is allied, they share the victory. Breaking an alliance makes the other tribe distrust you for 10 turns.</li>
       <li><b>Lighthouses</b> stand in the four corners of the world. The first time you sight each one you earn 3 ⭐ and 100 points.</li>
       <li><b>Online Play</b> lets friends on different devices share a game turn by turn. Create a game, send the code or invite link, and each player is told when it's their turn. Games are saved on the server, unfinished turns on your device, and <i>Play on another device</i> in the Game menu moves your seat to a phone or another browser.</li>
+      <li><b>Tribes.</b> Click any tribe's name to see how friendly it is and what it has. Tidekin, Ironclad and Sylvan have tech trees of their own.</li>
+      <li><b>Map Editor</b> on the main menu lets you paint your own world at any size from 10×10 to 64×64 and play on it.</li>
       <li><b>Saving.</b> There are three save slots. Pick one when you start a game; it saves after every turn. Load or delete games under Saved Games.</li>
       <li><b>Controls.</b> Drag to pan, scroll or pinch to zoom. <kbd>E</kbd> end turn, <kbd>N</kbd> next unit, <kbd>T</kbd> tech tree, <kbd>Esc</kbd> close or deselect. Shaders can be switched off in the Game menu.</li>
     </ul>
@@ -211,6 +245,24 @@
     <div id="go-text" class="muted"></div>
     <div class="row center"><button class="btn dark" id="btn-view">View Map</button><button class="btn green" id="btn-again">New Game</button></div>
   </div>
+</div>
+
+<!-- Another tribe's details -->
+<div id="player-info" class="overlay" hidden><div class="popup wide" id="pi-body"></div></div>
+
+<!-- Admin tools -->
+<button id="admin-btn" aria-label="Admin">⚙</button>
+<div id="admin-mode" hidden></div>
+<div id="admin-login" class="overlay" hidden>
+  <div class="popup">
+    <h2>Admin</h2>
+    <input type="password" id="admin-pass" placeholder="Password" autocomplete="off" aria-label="Admin password">
+    <p id="admin-err" class="net-error" role="alert"></p>
+    <div class="row center"><button class="btn dark" id="admin-cancel">Cancel</button><button class="btn green" id="admin-unlock">Unlock</button></div>
+  </div>
+</div>
+<div id="admin" class="overlay" hidden>
+  <div class="popup wide admin-pop"><button class="x" id="admin-close" aria-label="Close">✕</button><h2>Admin tools</h2><div id="admin-body"></div></div>
 </div>
 
 <script src="config.js"></script>
