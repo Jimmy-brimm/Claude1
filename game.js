@@ -1009,6 +1009,7 @@ function updateVis() { // units see two tiles around them (four from a mountain)
     for (const u of G.units) if (allied(u.owner, p)) markVis(V, u.x, u.y, T(u.x, u.y).t === 'mountain' ? 4 : 2, p); // allies share sight; sight ranges are doubled
     for (const c of cities) if (allied(c.b.owner, p)) markVis(V, c.x, c.y, 2 * (radiusOf(c.b) + 1) + (c.b.tower ? 4 : 0), p);
     for (let y = 0; y < G.n; y++) for (let x = 0; x < G.n; x++) if (T(x, y).imp === 'watchtower' && own[y][x] >= 0 && allied(own[y][x], p)) markVis(V, x, y, 4, p);
+    if (adminFog && p === G.view && !editing) markVis(V, 0, 0, G.n, p); // admin: no fog
   });
   checkLighthouses();
 }
@@ -1471,12 +1472,12 @@ function renderSheet() {
     const d = UNITS[u.type], st = stats(u), owner = G.players[u.owner];
     title = `<i class="dot" style="background:${owner.color}"></i>${!afloat(u) || swims(u) ? d.name : `${st.name} <small>carrying a ${d.name}</small>`}${u.vet ? ` <small class="vet">★ Veteran · ${PERKS[u.perk || 'hp'].desc}</small>` : ''}`;
     text = `<span class="chips"><span>${STAT_SVG.hp}${u.hp}/${maxHp(u)}</span><span>${STAT_SVG.atk}${st.atk}</span><span>${STAT_SVG.def}${st.def}</span><span>${STAT_SVG.mv}${st.mv}</span><span>${STAT_SVG.rng}${st.range}</span></span>`;
-    const status = u.owner !== me ? esc(owner.name) + (allied(u.owner, me) ? ' · ally 🤝' : '') : u.done || (!canMove(u) && !canAttack(u)) ? 'Done for this turn' : canMove(u) && canAttack(u) ? 'Ready' : canMove(u) ? 'Can still move' : 'Can still attack';
+    const status = u.owner !== me ? `<a class="pname" data-player="${u.owner}" href="#">${esc(owner.name)}</a>` + (allied(u.owner, me) ? ' · ally 🤝' : '') : u.done || (!canMove(u) && !canAttack(u)) ? 'Done for this turn' : canMove(u) && canAttack(u) ? 'Ready' : canMove(u) ? 'Can still move' : 'Can still attack';
     text += `<span class="status">${status}</span>`;
     if (st.skills.length) text += `<span class="skills">${st.skills.map(k => `<span title="${SKILL_INFO[k]}">${SKILL_INFO[k].split(':')[0]}</span>`).join('')}</span>`;
   } else if (b && b.kind === 'city') {
     const owner = G.players[b.owner];
-    title = `${b.capital ? CROWN_SVG : `<i class="dot" style="background:${owner.color}"></i>`}${esc(b.name)} <small>${b.capital ? 'Capital' : 'City'} · level ${b.level}${b.owner === me ? '' : ` · ${esc(owner.name)}`}</small>`;
+    title = `${b.capital ? CROWN_SVG : `<i class="dot" style="background:${owner.color}"></i>`}${esc(b.name)} <small>${b.capital ? 'Capital' : 'City'} · level ${b.level}${b.owner === me ? '' : ` · <a class="pname" data-player="${b.owner}" href="#">${esc(owner.name)}</a>`}</small>`;
     if (b.owner === me) {
       const need = b.level >= MAX_LEVEL ? 0 : popNeeded(b), c = { x, y, b };
       const pips = need ? `<span class="pips" title="Population ${b.pop} of ${need}">${Array.from({ length: need }, (_, i) => `<i class="${i < b.pop ? 'on' : ''}"></i>`).join('')}</span>` : '';
@@ -1657,7 +1658,7 @@ function dipCell(i) { // the alliance button beside each rival in the standings
 function renderGameMenu() {
   $('gm-title').textContent = `${G.mode === 'perfection' ? `Perfection · turn ${G.turn} of ${G.turnLimit}` : `Domination · turn ${G.turn}`} · ${G.diff[0].toUpperCase() + G.diff.slice(1)}`;
   $('gm-tribes').innerHTML = G.players.map((p, i) => ({ p, i, s: score(i) })).sort((a, b) => b.s - a.s).map(({ p, i, s }) =>
-    `<div class="trow ${p.alive ? '' : 'dead'}"><img src="${tribeIcon(p.tribe)}" alt=""><b style="color:${p.color}">${esc(p.name)}${p.ai ? '' : ' 👤'}${net && !p.ai ? ` <small>${esc(net.seats[i] && net.seats[i].taken ? net.seats[i].name || 'Player' : 'open seat')}</small>` : ''}</b><span>${cityTiles(i).length} cities</span><span>${p.techs.length} techs</span><span class="num">${s.toLocaleString('en-US')}</span>${dipCell(i)}</div>`).join('');
+    `<div class="trow ${p.alive ? '' : 'dead'}"><img src="${tribeIcon(p.tribe)}" alt=""><b class="pname" data-player="${i}" role="button" tabindex="0" title="Show ${esc(p.name)}" style="color:${p.color}">${esc(p.name)}${p.ai ? '' : ' 👤'}${net && !p.ai ? ` <small>${esc(net.seats[i] && net.seats[i].taken ? net.seats[i].name || 'Player' : 'open seat')}</small>` : ''}</b><span>${cityTiles(i).length} cities</span><span>${p.techs.length} techs</span><span class="num">${s.toLocaleString('en-US')}</span>${dipCell(i)}</div>`).join('');
   $('gm-sound').textContent = muted ? 'Sound: off' : 'Sound: on';
   $('gm-fx').textContent = !postfx.available ? 'Shaders: unavailable' : postfx.on ? 'Shaders: on' : 'Shaders: off';
   $('gm-fx').disabled = !postfx.available;
@@ -4250,6 +4251,7 @@ function unitAtScreen(mx, my) {
 }
 function onTap(mx, my) {
   if (editing) { const t = pick(mx, my); if (inb(t.x, t.y)) editorPaint(t.x, t.y); return; }
+  if (adminPlace && G) { const t = pick(mx, my); adminTap(t.x, t.y); return; }
   if (!G || G.over) return;
   const hit = unitAtScreen(mx, my);
   if (canAct() && hit && sel && sel.kind === 'unit') { // tapping an enemy's sprite attacks it
@@ -4816,6 +4818,200 @@ function designWorld(cfg, rnd, shuffle) {
   return { tiles, S, hasSettlements };
 }
 const randIntFrom = (rnd, k) => Math.floor(rnd() * k);
+
+/* ---------- player status window ---------- */
+// How a tribe feels about another, 0-100, with the reasons. Computer tribes act on the same signals.
+function attitude(of, to) {
+  const reasons = [];
+  let v = 50;
+  if (allied(of, to)) { v += 25; reasons.push(['🤝', 'Allies', +25]); }
+  const mine = score(of), theirs = score(to);
+  const rival = G.players.map((pl, i) => ({ pl, i })).filter(({ pl, i }) => pl.alive && i !== of && i !== to && !allied(of, i)).sort((a, b) => score(b.i) - score(a.i))[0];
+  if (rival && score(rival.i) > Math.max(mine, theirs) * 0.9) { v += 15; reasons.push(['⚔️', `Both fear ${rival.pl.name}`, +15]); }
+  if (theirs > mine * 1.3) { v += 10; reasons.push(['💪', 'You are strong; a useful friend', +10]); }
+  if (mine > theirs * 1.6 && !allied(of, to)) { v -= 10; reasons.push(['😤', 'They feel safe without you', -10]); }
+  const fought = (G.fights || {})[pairKey(of, to)];
+  if (fought >= G.turn - 3) { v -= 25; reasons.push(['🩸', `Fought you on turn ${fought}`, -25]); }
+  if ((G.grudges || {})[pairKey(of, to)] > G.turn) { v -= 40; reasons.push(['💔', 'You broke an alliance with them', -40]); }
+  if (!metList(of).includes(to) && !allied(of, to)) { reasons.push(['❔', 'They have not met you yet', 0]); }
+  v = Math.max(0, Math.min(100, v));
+  const label = v >= 75 ? 'Friendly' : v >= 58 ? 'Warm' : v >= 42 ? 'Neutral' : v >= 25 ? 'Wary' : 'Hostile';
+  return { v, label, reasons };
+}
+function showPlayer(i) {
+  const me = G.view, pl = G.players[i], tr = TRIBES[pl.tribe], cities = cityTiles(i), units = G.units.filter(u => u.owner === i);
+  const known = i === me || allied(me, i) || adminOn; // the treasury and income stay secret unless you're allies (or an admin)
+  const human = !pl.ai, seat = net && net.seats[i];
+  const who = human && seat && seat.name ? ` · ${esc(seat.name)}` : human ? ' · human player' : ' · computer';
+  const rel = i === me ? 'This is you' : !pl.alive ? 'Eliminated' : allied(me, i) ? 'Allied with you 🤝' : 'Rival';
+  const strongest = units.slice().sort((a, b) => (UNITS[b.type].cost || 20) - (UNITS[a.type].cost || 20)).slice(0, 5);
+  const branch = tr.noBranch ? Object.keys(TECHS).filter(k => TECHS[k].tribe === pl.tribe).map(k => `${TECHS[k].icon} ${TECHS[k].name}`).join(' → ') : '';
+  let feel = '';
+  if (i !== me && pl.alive) {
+    if (pl.ai) {
+      const a = attitude(i, me);
+      feel = `<div class="pi-feel"><span>Feelings towards you: <b>${a.label}</b></span><div class="pi-meter"><i style="width:${a.v}%;background:${a.v >= 58 ? 'var(--good)' : a.v >= 42 ? 'var(--gold)' : 'var(--bad)'}"></i></div>
+        <ul>${a.reasons.map(([ic, t, d]) => `<li>${ic} ${esc(t)}${d ? ` <b class="${d > 0 ? 'up' : 'down'}">${d > 0 ? '+' : ''}${d}</b>` : ''}</li>`).join('') || '<li>Nothing stands out between you.</li>'}</ul></div>`;
+    } else feel = '<div class="pi-feel"><span>A human player decides for themselves how friendly to be.</span></div>';
+  }
+  const alliesList = alliesOf(i).map(k => `<span style="color:${G.players[k].color}">${esc(G.players[k].name)}</span>`).join(', ') || 'none';
+  const fought = (G.fights || {})[pairKey(i, me)];
+  $('pi-body').innerHTML = `
+    <div class="pi-head" style="--c:${pl.color}"><img src="${tribeIcon(pl.tribe)}" alt=""><div><h2 style="color:${pl.color}">${esc(pl.name)}<small>${who}</small></h2><p class="muted">${esc(tr.about)} · ${rel}</p></div></div>
+    ${feel}
+    <div class="pi-stats">
+      <div><b>${score(i).toLocaleString('en-US')}</b><span>score</span></div>
+      <div><b>${cities.length}</b><span>cities · ${cities.reduce((s, c) => s + c.b.level, 0)} levels</span></div>
+      <div><b>${units.length}</b><span>units</span></div>
+      <div><b>${pl.techs.length}</b><span>technologies</span></div>
+      <div><b>${known ? pl.stars : '?'}</b><span>stars</span></div>
+      <div><b>${known ? '+' + income(i) : '?'}</b><span>per turn</span></div>
+    </div>
+    <div class="pi-lines">
+      ${strongest.length ? `<p><span>Army</span><span class="pi-army">${strongest.map(u => `<img src="${unitIcon(u.type, pl.tribe)}" alt="${UNITS[u.type].name}" title="${UNITS[u.type].name}">`).join('')}${units.length > 5 ? ` +${units.length - 5}` : ''}</span></p>` : ''}
+      <p><span>Capital</span><span>${esc((cities.find(c => c.b.capital) || cities[0] || { b: { name: '—' } }).b.name)}</span></p>
+      <p><span>Allies</span><span>${alliesList}</span></p>
+      ${i !== me ? `<p><span>Last fight with you</span><span>${fought ? `turn ${fought}` : 'never'}</span></p>` : ''}
+      <p><span>Started with</span><span>${TECHS[tr.tech].icon} ${TECHS[tr.tech].name}</span></p>
+      ${branch ? `<p><span>Own tech tree</span><span>${branch} <small class="muted">(no ${TECHS[tr.noBranch].name} branch)</small></span></p>` : ''}
+    </div>
+    <div class="row center">${i !== me && pl.alive ? dipCell(i).replace('class="dip', 'class="dip big') : ''}<button class="btn dark" id="pi-close">Close</button></div>`;
+  $('player-info').dataset.player = i;
+  $('player-info').hidden = false;
+}
+document.addEventListener('click', e => { // any tribe name with data-player opens its window
+  const el = e.target.closest('[data-player]');
+  if (!el || !G || editing || el.closest('#player-info')) return;
+  e.preventDefault(); sfx('click'); showPlayer(+el.dataset.player);
+});
+$('player-info').addEventListener('click', e => {
+  if (e.target.id === 'pi-close' || e.target === $('player-info')) { $('player-info').hidden = true; return; }
+  const b = e.target.closest('button.dip');
+  if (!b || b.disabled || !canAct()) return;
+  const i = +$('player-info').dataset.player, me = G.view;
+  if (b.dataset.ally !== undefined) {
+    const res = proposeAlliance(me, i), name = G.players[i].name;
+    toast(res === 'accepted' ? `${name} accepts! You are now allies. 🤝` : res === 'sent' ? `Offer sent. ${name} will answer on their turn.` : `${name} refuses your alliance for now.`);
+  } else if (b.dataset.break !== undefined) {
+    if (confirmBreak !== i) { confirmBreak = i; b.textContent = 'Break it?'; return; }
+    confirmBreak = -1; breakAlliance(me, i);
+  }
+  refreshSel(); ui(); showPlayer(i);
+});
+
+/* ---------- admin tools ---------- */
+// A testing panel behind a password. The check runs in the browser, so it keeps casual players out,
+// not determined ones: anyone can read a page's code.
+const ADMIN_HASH = 8722177309237446;
+function cyrb53(str, seed = 0) {
+  let h1 = 0xdeadbeef ^ seed, h2 = 0x41c6ce57 ^ seed;
+  for (let i = 0; i < str.length; i++) { const ch = str.charCodeAt(i); h1 = Math.imul(h1 ^ ch, 2654435761); h2 = Math.imul(h2 ^ ch, 1597334677); }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507); h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507); h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return 4294967296 * (2097151 & h2) + (h1 >>> 0);
+}
+let adminOn = (() => { try { return sessionStorage.getItem('polyweb-admin') === '1'; } catch (e) { return false; } })();
+let adminFog = false, adminPlace = null, adminTarget = 0; // adminPlace: { type, owner, vet } or { remove: true }
+$('admin-btn').onclick = () => {
+  if (!adminOn) { $('admin-pass').value = ''; $('admin-err').textContent = ''; $('admin-login').hidden = false; setTimeout(() => $('admin-pass').focus(), 30); return; }
+  renderAdmin(); $('admin').hidden = false;
+};
+function adminUnlock() {
+  if (cyrb53($('admin-pass').value, 7) !== ADMIN_HASH) { $('admin-err').textContent = 'Wrong password.'; sfx('lose'); return; }
+  adminOn = true;
+  try { sessionStorage.setItem('polyweb-admin', '1'); } catch (e) { /* ignore */ }
+  $('admin-login').hidden = true; sfx('level');
+  renderAdmin(); $('admin').hidden = false;
+}
+$('admin-unlock').onclick = adminUnlock;
+$('admin-pass').addEventListener('keydown', e => { if (e.key === 'Enter') adminUnlock(); });
+$('admin-cancel').onclick = () => { $('admin-login').hidden = true; };
+function renderAdmin() {
+  const box = $('admin-body');
+  if (!G || editing) { box.innerHTML = '<p class="muted">Start or load a game to use the admin tools.</p><div class="row center"><button class="btn dark" data-adm="close">Close</button><button class="btn dark" data-adm="lock">Lock admin</button></div>'; return; }
+  adminTarget = Math.min(adminTarget, G.players.length - 1);
+  const pl = G.players[adminTarget], opt = (list, cur) => list.map(([v, l]) => `<option value="${v}" ${String(v) === String(cur) ? 'selected' : ''}>${l}</option>`).join('');
+  const players = G.players.map((p, i) => [i, `${p.name}${i === G.view ? ' (you)' : ''}${p.alive ? '' : ' ✝'}`]);
+  box.innerHTML = `
+    ${net ? '<p class="adm-warn">This is an online game: your changes are sent to the other players with your turn.</p>' : ''}
+    <section><h3>Vision</h3><div class="adm-row"><label><input type="checkbox" id="adm-fog" ${adminFog ? 'checked' : ''}> No fog for me</label><button class="btn blue" data-adm="reveal">Explore whole map</button></div></section>
+    <section><h3>Player</h3><div class="adm-row"><select id="adm-player">${opt(players, adminTarget)}</select>
+      <select id="adm-tribe">${opt(TRIBES.map((t, i) => [i, `Tribe: ${t.name}`]), pl.tribe)}</select>
+      <label><input type="checkbox" id="adm-ai" ${pl.ai ? 'checked' : ''} ${adminTarget === G.view ? 'disabled' : ''}> Computer</label></div>
+      <div class="adm-row"><button class="btn blue" data-adm="stars10">+10 ⭐</button><button class="btn blue" data-adm="stars100">+100 ⭐</button><button class="btn dark" data-adm="stars0">0 ⭐</button>
+      <button class="btn blue" data-adm="alltech">All techs</button><button class="btn dark" data-adm="notech">Reset techs</button>
+      ${adminTarget !== G.view ? `<button class="btn ${allied(G.view, adminTarget) ? 'dark' : 'green'}" data-adm="ally">${allied(G.view, adminTarget) ? 'Break alliance' : 'Ally with me'}</button>` : ''}</div></section>
+    <section><h3>Place units</h3><div class="adm-row"><select id="adm-unit">${opt(Object.keys(UNITS).map(k => [k, UNITS[k].name]), adminPlace && adminPlace.type || 'warrior')}</select>
+      <select id="adm-owner">${opt(players, adminPlace && adminPlace.owner !== undefined ? adminPlace.owner : G.view)}</select>
+      <label><input type="checkbox" id="adm-vet"> Veteran</label></div>
+      <div class="adm-row"><button class="btn green" data-adm="place">Tap the map to place</button><button class="btn dark" data-adm="remove">Tap the map to remove</button></div></section>
+    <section><h3>Unit prices</h3><div class="adm-prices">${Object.keys(UNITS).filter(k => UNITS[k].train !== false).map(k => `<label><img src="${unitIcon(k, G.players[G.view].tribe)}" alt=""><span>${UNITS[k].name}</span><input type="number" min="0" max="999" data-price="${k}" value="${unitCost(k)}"></label>`).join('')}</div>
+      <div class="adm-row"><button class="btn dark" data-adm="prices0">All free</button><button class="btn dark" data-adm="pricesreset">Normal prices</button></div></section>
+    <section><h3>Units and cities</h3><div class="adm-row"><button class="btn blue" data-adm="refresh">Refresh my units</button><button class="btn blue" data-adm="heal">Heal my units</button>
+      <button class="btn blue" data-adm="citylevel">Selected city +1 level</button><button class="btn blue" data-adm="allcities">All my cities +1 level</button></div></section>
+    <section><h3>Game</h3><div class="adm-row"><button class="btn green" data-adm="win">Win now</button><button class="btn dark" data-adm="lock">Lock admin</button><button class="btn dark" data-adm="close">Close</button></div></section>`;
+}
+function adminDo(key) {
+  const me = G && G.view, pl = G && G.players[adminTarget];
+  switch (key) {
+    case 'close': $('admin').hidden = true; return;
+    case 'lock': adminOn = false; adminFog = false; adminPlace = null; try { sessionStorage.removeItem('polyweb-admin'); } catch (e) { /* ignore */ } $('admin').hidden = true; if (G && !editing) { updateVis(); ui(); } adminBanner(); return;
+    case 'reveal': for (const r of G.vis[me]) for (let x = 0; x < r.length; x++) if (!r[x]) r[x] = 1; updateVis(); break;
+    case 'stars10': pl.stars += 10; break;
+    case 'stars100': pl.stars += 100; break;
+    case 'stars0': pl.stars = 0; break;
+    case 'alltech': pl.techs = Object.keys(TECHS).filter(k => techVisible(adminTarget, k)); if (hasTech(adminTarget, 'cartography')) updateVis(); break;
+    case 'notech': pl.techs = [TRIBES[pl.tribe].tech]; break;
+    case 'ally': setAlliance(me, adminTarget, !allied(me, adminTarget)); break;
+    case 'place': adminPlace = { type: $('adm-unit').value, owner: +$('adm-owner').value, vet: $('adm-vet').checked }; $('admin').hidden = true; adminBanner(); return;
+    case 'remove': adminPlace = { remove: true }; $('admin').hidden = true; adminBanner(); return;
+    case 'prices0': G.costs = Object.fromEntries(Object.keys(UNITS).map(k => [k, 0])); break;
+    case 'pricesreset': G.costs = {}; break;
+    case 'refresh': for (const u of G.units) if (u.owner === me) { u.moved = u.attacked = u.done = false; u.chain = 0; } break;
+    case 'heal': for (const u of G.units) if (u.owner === me) u.hp = maxHp(u); break;
+    case 'citylevel': {
+      const t = sel && sel.kind === 'tile' ? T(sel.x, sel.y) : null;
+      if (!t || !t.b || t.b.kind !== 'city') { toast('Select one of the cities on the map first.'); return; }
+      t.b.level = Math.min(MAX_LEVEL, t.b.level + 1); t.b.pop = 0; break;
+    }
+    case 'allcities': for (const c of cityTiles(me)) { c.b.level = Math.min(MAX_LEVEL, c.b.level + 1); c.b.pop = 0; } break;
+    case 'win': $('admin').hidden = true; endGame(me, 'domination'); return;
+  }
+  sfx('click'); refreshSel(); ui(); renderAdmin();
+}
+function adminBanner() { // a strip at the top while placing or removing units
+  const b = $('admin-mode');
+  if (!adminPlace) { b.hidden = true; return; }
+  b.innerHTML = adminPlace.remove ? 'Admin: tap units to remove them <button class="btn dark" id="adm-stop">Done</button>'
+    : `Admin: tap tiles to place ${UNITS[adminPlace.type].name}s for ${esc(G.players[adminPlace.owner].name)} <button class="btn dark" id="adm-stop">Done</button>`;
+  b.hidden = false;
+}
+$('admin-mode').addEventListener('click', e => { if (e.target.id === 'adm-stop') { adminPlace = null; adminBanner(); } });
+function adminTap(x, y) { // place or remove a unit where the admin tapped
+  if (!inb(x, y)) return;
+  const here = unitAt(x, y);
+  if (adminPlace.remove) { if (here) { G.units = G.units.filter(u => u !== here); addGhost(here); } }
+  else if (!here) {
+    const { type, owner, vet } = adminPlace;
+    spawns.set(G.nextId, performance.now());
+    G.units.push({ id: G.nextId++, type, owner, x, y, hp: UNITS[type].hp + (vet ? 5 : 0), moved: false, attacked: false, done: false, kills: vet ? 3 : 0, vet, perk: vet ? 'hp' : undefined, home: null });
+  } else toast('There is already a unit there.');
+  updateVis(); refreshSel(); ui();
+}
+$('admin-body').addEventListener('click', e => { const b = e.target.closest('[data-adm]'); if (b) adminDo(b.dataset.adm); });
+$('admin-body').addEventListener('change', e => {
+  const t = e.target;
+  if (t.id === 'adm-fog') { adminFog = t.checked; updateVis(); ui(); }
+  else if (t.id === 'adm-player') { adminTarget = +t.value; renderAdmin(); }
+  else if (t.id === 'adm-tribe') { // a different tribe: new look, name and colour; it keeps its techs, cities and units
+    const pl = G.players[adminTarget], k = +t.value;
+    pl.tribe = k; pl.name = TRIBES[k].name; pl.color = TRIBES[k].color;
+    if (!pl.techs.includes(TRIBES[k].tech)) pl.techs.push(TRIBES[k].tech);
+    refreshSel(); ui(); renderAdmin();
+  } else if (t.id === 'adm-ai') { G.players[adminTarget].ai = t.checked; ui(); }
+  else if (t.dataset.price) { G.costs = G.costs || {}; G.costs[t.dataset.price] = Math.max(0, Math.min(999, +t.value || 0)); refreshSel(); ui(); }
+});
+$('admin-close').onclick = () => { $('admin').hidden = true; };
 
 /* ---------- online play ---------- */
 // Turn-by-turn games between devices, stored in a Supabase project (see supabase/schema.sql and config.js).
