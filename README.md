@@ -29,10 +29,11 @@ It has original art and code and is not affiliated with Midjiwan. There is no bu
 - **Alliances** with computer or human tribes: shared vision, no fighting, +1 ⭐ a turn each, and a shared victory when every tribe left is allied. Computer tribes court allies against the leader and drop allies who grow too strong.
 - **Ruins** hold stars, free technology, an explorer, a veteran swordsman or new citizens.
 - **Look and feel:** low-poly isometric art drawn in code. Each tribe's homeland has its own climate (meadow, autumn woods, jungle, desert, highland, tundra) with matching trees, rock, fruit and wildlife (deer, boar, tapir, camel, goat, reindeer). Land sits on earthen slabs; the sea blends from turquoise shallows to deep blue, with surf and glints. Every tribe has its own headgear and its own architecture (yurts, timber houses, stilt huts, adobe, stone keeps, igloos) that grows with city level. Objects cast soft shadows, clouds part as you explore, and snow, leaves, petals, embers, fireflies, sparkles and butterflies drift over their regions. Units walk their path tile by tile, and zoom glides. The main menu shows a living world map.
-- **Shaders:** a WebGL pass adds bloom, colour grading, drifting cloud shadows and a vignette. It falls back to plain canvas when WebGL is missing, switches itself off if frames get slow, and has an on/off toggle in the Game menu.
+- **Shaders:** a WebGL pass adds bloom, colour grading, drifting cloud shadows and a vignette. It falls back to plain canvas when WebGL is missing, switches itself off if frames get slow, and has an on/off toggle in Settings.
+- **Styles** (Settings, on the main menu and in the Game menu): *Standard*; *Sci-fi* with neon glass panels, cut corners, Orbitron lettering, seas of light, a glowing grid over the land, dark nebula clouds, a starfield and cool scanlined grading; *Fantasy* with carved wood, gold trim, Cinzel lettering, painted green seas, cream clouds and warm golden light; and *Nostalgic* with square chunky buttons, hard shadows, pixel lettering, the world drawn in big pixels, a small colour palette and TV scanlines. The style is kept per device, so players in the same online game can each use their own.
 - **Fog of war**: units see two tiles (four from a mountain) and cities see well past their borders; computer opponents that research, build, expand and use boats.
 - **Three save slots**, chosen when a game starts and saved after every turn. Saved Games loads or deletes them.
-- **Autosave** to the browser after every turn, sound effects with a mute toggle, mouse and touch controls.
+- **Autosave** to the browser after every turn, sound effects with a mute toggle in Settings, mouse and touch controls.
 
 ## Rules
 

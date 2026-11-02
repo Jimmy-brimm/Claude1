@@ -1682,9 +1682,6 @@ function renderGameMenu() {
   $('gm-title').textContent = `${G.mode === 'perfection' ? `Perfection · turn ${G.turn} of ${G.turnLimit}` : `Domination · turn ${G.turn}`} · ${G.diff[0].toUpperCase() + G.diff.slice(1)}`;
   $('gm-tribes').innerHTML = G.players.map((p, i) => ({ p, i, s: score(i) })).sort((a, b) => b.s - a.s).map(({ p, i, s }) =>
     `<div class="trow ${p.alive ? '' : 'dead'}"><img src="${tribeIcon(p.tribe)}" alt=""><b class="pname" data-player="${i}" role="button" tabindex="0" title="Show ${esc(p.name)}" style="color:${p.color}">${esc(p.name)}${p.ai ? '' : ' 👤'}${net && !p.ai ? ` <small>${esc(net.seats[i] && net.seats[i].taken ? net.seats[i].name || 'Player' : 'open seat')}</small>` : ''}</b><span>${cityTiles(i).length} cities</span><span>${p.techs.length} techs</span><span class="num">${s.toLocaleString('en-US')}</span>${dipCell(i)}</div>`).join('');
-  $('gm-sound').textContent = muted ? 'Sound: off' : 'Sound: on';
-  $('gm-fx').textContent = !postfx.available ? 'Shaders: unavailable' : postfx.on ? 'Shaders: on' : 'Shaders: off';
-  $('gm-fx').disabled = !postfx.available;
   $('gm-title').textContent += net ? ` · Online game ${net.id}` : ` · Saved in slot ${G.slot || 1}`;
   $('gm-invite').hidden = !net;
   $('gm-seat').hidden = !net;
@@ -1810,7 +1807,24 @@ const CLIMATES = [
 const SKIN = ['#f1c9a5', '#c98a5e', '#8d5a3b', '#e3b27c', '#d9b38c', '#f6dcc8', '#a8704e', '#f3d2b3', '#8f7a52', '#e9dcef', '#c99a6e', '#e2c3a0', '#b5c98f'];
 const EMBLEMS = ['chevron', 'flame', 'leaf', 'sun', 'peak', 'flake', 'ember', 'petal', 'wave', 'gem', 'trident', 'gear', 'leaf'];
 const emblemInk = col => (luma(col) > 0.82 ? '#4a4f6a' : 'rgba(255,255,255,.92)'); // dark ink on very pale colours
-const DEPTH_COLS = ['#6ad9e3', '#5ccde0', '#48b2e2', '#3d96d7', '#3583ca', '#2e71b8'];
+/* looks: each theme restyles the menus (style.css, by body[data-theme]) and how the map is painted and shaded */
+const THEMES = {
+  standard: { name: 'Standard', blurb: 'Bright, rounded and friendly. The classic look.', fx: 0, pixel: 1,
+    bg: ['#0b2746', '#061629'], vig: 'rgba(0,8,22,.45)', fog: '#c3cfdf', shore: '16,52,88', puff: ['#b8c7da', '#eef3f9', '255,255,255', '140,165,200'],
+    depth: ['#6ad9e3', '#5ccde0', '#48b2e2', '#3d96d7', '#3583ca', '#2e71b8'] },
+  scifi: { name: 'Sci-fi', blurb: 'Neon glass panels, a glowing grid over the land and seas of light under a starfield.', fx: 1, pixel: 1,
+    bg: ['#070b24', '#010210'], vig: 'rgba(0,0,12,.55)', fog: '#262e62', shore: '10,20,70', puff: ['#1a2152', '#323f86', '130,225,255', '60,20,120'],
+    depth: ['#5ff6ff', '#3fdcf2', '#26a8dc', '#2a6fc4', '#3a45a8', '#241e6a'], grid: 'rgba(110,245,255,.30)', stars: true },
+  fantasy: { name: 'Fantasy', blurb: 'Parchment, carved wood and gold. Painted seas under a warm golden light.', fx: 2, pixel: 1,
+    bg: ['#3a2814', '#140b04'], vig: 'rgba(28,12,0,.6)', fog: '#e6d8b6', shore: '30,52,40', puff: ['#bba57a', '#ece0c0', '255,246,222', '140,105,60'],
+    depth: ['#9fe0c0', '#7fcdb0', '#5cb09c', '#3f9088', '#2f7273', '#25585e'] },
+  nostalgic: { name: 'Nostalgic', blurb: 'An old console: chunky pixels, 8-bit lettering and a flickering TV.', fx: 3, pixel: 2,
+    bg: ['#000000', '#000000'], vig: 'rgba(0,0,0,.5)', fog: '#bcbcbc', shore: '0,0,80', puff: ['#9c9cb4', '#fcfcfc', '255,255,255', '110,110,170'],
+    depth: ['#7ce4ff', '#5cc4fc', '#3c9cf8', '#2878e8', '#1858d0', '#0838a8'] },
+};
+let theme = (() => { try { const t = localStorage.getItem('polyweb-theme'); return THEMES[t] ? t : 'standard'; } catch (e) { return 'standard'; } })();
+const TH_ = () => THEMES[theme];
+let DEPTH_COLS = TH_().depth;
 const CITY_SLOTS = [[0, -9], [-14, -2], [14, -2], [-7, 5], [8, 6], [0, 11]];
 const hitAnims = new Map(), faces = new Map(), revealAt = new Map(), spawns = new Map();
 let frameK = 1, lastFrame = 0; // frameK: how many 60 fps frames the last frame lasted, so motion keeps its speed at any frame rate
@@ -1851,12 +1865,56 @@ function mix(a, b, t) {
 const climateOf = tl => CLIMATES[tl.c] || CLIMATES[0];
 
 function resize() {
-  dpr = window.devicePixelRatio || 1; W = innerWidth; H = innerHeight;
+  const th = TH_();
+  dpr = th.pixel > 1 ? 1 / th.pixel : window.devicePixelRatio || 1; // nostalgic draws fewer, bigger pixels
+  W = innerWidth; H = innerHeight;
   cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
   bgGrad = ctx.createLinearGradient(0, 0, 0, H);
-  bgGrad.addColorStop(0, '#0b2746'); bgGrad.addColorStop(1, '#061629');
+  bgGrad.addColorStop(0, th.bg[0]); bgGrad.addColorStop(1, th.bg[1]);
   vignette = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.32, W / 2, H / 2, Math.max(W, H) * 0.8);
-  vignette.addColorStop(0, 'rgba(0,0,0,0)'); vignette.addColorStop(1, 'rgba(0,8,22,.45)');
+  vignette.addColorStop(0, 'rgba(0,0,0,0)'); vignette.addColorStop(1, th.vig);
+  overlayPat = null;
+}
+function setTheme(id) {
+  if (!THEMES[id]) return;
+  theme = id; DEPTH_COLS = THEMES[id].depth;
+  document.body.dataset.theme = id;
+  try { localStorage.setItem('polyweb-theme', id); } catch (e) { /* ignore */ }
+  groundCaches.clear(); cloudCaches.clear();
+  resize();
+}
+// The sky behind the map: a slow twinkling starfield for sci-fi, nothing extra otherwise.
+let starField = null;
+function drawBackdrop(now) {
+  if (!TH_().stars) return;
+  if (!starField) starField = Array.from({ length: 160 }, (_, i) => [hash(i, 1, 3), hash(i, 2, 3), hash(i, 3, 3)]);
+  const t = reduceMotion ? 0 : now / 1000;
+  for (const [x, y, s] of starField) {
+    ctx.globalAlpha = 0.35 + 0.45 * (0.5 + 0.5 * Math.sin(t * (0.6 + s * 2) + s * 40));
+    ctx.fillStyle = s > 0.85 ? '#ff7ae6' : s > 0.6 ? '#7ff3ff' : '#ffffff';
+    const r = 0.6 + s * 1.3;
+    ctx.fillRect(x * W, y * H, r, r);
+  }
+  ctx.globalAlpha = 1;
+}
+// Without shaders, a plain 2D tint and scanlines stand in for the theme's colour grade.
+let overlayPat = null;
+function drawThemeOverlay() {
+  const fx = TH_().fx;
+  if (!fx) return;
+  ctx.save();
+  if (fx === 1) { ctx.globalCompositeOperation = 'soft-light'; ctx.fillStyle = 'rgba(40,90,255,.35)'; ctx.fillRect(0, 0, W, H); }
+  if (fx === 2) { ctx.globalCompositeOperation = 'soft-light'; ctx.fillStyle = 'rgba(255,170,60,.35)'; ctx.fillRect(0, 0, W, H); }
+  if (fx === 1 || fx === 3) {
+    if (!overlayPat) {
+      const p = makeCanvas(1, fx === 3 ? 2 : 3);
+      withCtx(p, () => { ctx.fillStyle = `rgba(0,0,0,${fx === 3 ? 0.16 : 0.1})`; ctx.fillRect(0, 0, 1, 1); });
+      overlayPat = ctx.createPattern(p, 'repeat');
+    }
+    ctx.globalCompositeOperation = 'source-over'; ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = overlayPat; ctx.fillRect(0, 0, cv.width, cv.height);
+  }
+  ctx.restore();
 }
 const wxOf = (x, y) => (x - y) * TW / 2;
 const wyOf = (x, y) => (x + y) * TH / 2;
@@ -3635,14 +3693,15 @@ const PUFFS = [
 ];
 function paintPuff(i) {
   const cs = PUFFS[i];
-  for (const [x, y, r] of cs) circle(x + 1.2, y + 2.6, r, '#b8c7da');
-  for (const [x, y, r] of cs) circle(x, y, r * 0.94, '#eef3f9');
+  const [under, body, hi, lo] = TH_().puff;
+  for (const [x, y, r] of cs) circle(x + 1.2, y + 2.6, r, under);
+  for (const [x, y, r] of cs) circle(x, y, r * 0.94, body);
   ctx.globalCompositeOperation = 'source-atop';
   const g = ctx.createLinearGradient(0, -16, 0, 15);
-  g.addColorStop(0, 'rgba(255,255,255,.95)'); g.addColorStop(0.5, 'rgba(255,255,255,0)'); g.addColorStop(1, 'rgba(140,165,200,.45)');
+  g.addColorStop(0, `rgba(${hi},.95)`); g.addColorStop(0.5, `rgba(${hi},0)`); g.addColorStop(1, `rgba(${lo},.45)`);
   ctx.fillStyle = g; ctx.fillRect(-30, -22, 60, 44);
   ctx.globalCompositeOperation = 'source-over';
-  for (const [x, y, r] of cs.slice(0, 2)) circle(x - r * 0.3, y - r * 0.36, r * 0.42, 'rgba(255,255,255,.8)');
+  for (const [x, y, r] of cs.slice(0, 2)) circle(x - r * 0.3, y - r * 0.36, r * 0.42, `rgba(${hi},.8)`);
 }
 function paintPuffShadow(i) {
   for (const [x, y, r] of PUFFS[i]) {
@@ -3664,7 +3723,7 @@ function puffAt(x, y, i, t, grow) {
 function cloudSprites() {
   return {
     shadows: [0, 1, 2].map(i => getSprite('puffsh' + i, [-30, -24, 60, 48], () => paintPuffShadow(i))),
-    puffs: [0, 1, 2].map(i => getSprite('puff' + i, [-25, -21, 52, 42], () => paintPuff(i))),
+    puffs: [0, 1, 2].map(i => getSprite('puff' + theme + i, [-25, -21, 52, 42], () => paintPuff(i))),
   };
 }
 function paintPuffs(list, t, sp) {
@@ -3733,7 +3792,7 @@ function groundKey() {
     if (t.b) bld++;
     if (t.road) bld += 1000;
   }
-  return `${ex}|${imp}|${res}|${bld}|${G.view}|${groundScale(G.n).toFixed(2)}|${G.edits || 0}`; // edits: the map editor changed terrain
+  return `${ex}|${imp}|${res}|${bld}|${G.view}|${groundScale(G.n).toFixed(2)}|${G.edits || 0}|${theme}`; // edits: the map editor changed terrain
 }
 function ensureGround(now) {
   const id = G.seed + '|' + G.n, key = groundKey();
@@ -3786,7 +3845,7 @@ function paintGround(n, V, X0, Y0, Wd, Ht) {
   ctx.drawImage(tiny, X0, Y0, tiny.width * 3 / qs, tiny.height * 3 / qs);
   const edgeShade = (a, b, off) => { // water darkens at the foot of a cliff
     const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2, gr = ctx.createLinearGradient(mx, my, mx + off[0], my + off[1]);
-    gr.addColorStop(0, 'rgba(16,52,88,.5)'); gr.addColorStop(1, 'rgba(16,52,88,0)');
+    const sh = TH_().shore; gr.addColorStop(0, `rgba(${sh},.5)`); gr.addColorStop(1, `rgba(${sh},0)`);
     poly([a, b, [b[0] + off[0], b[1] + off[1]], [a[0] + off[0], a[1] + off[1]]], gr);
   };
   for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
@@ -3800,12 +3859,18 @@ function paintGround(n, V, X0, Y0, Wd, Ht) {
     const y = s - x;
     if (y < -2 || y > n + 1) continue;
     const wx = wxOf(x, y), wy = wyOf(x, y);
-    if (x < 0 || y < 0 || x >= n || y >= n || !V[y][x]) { diamond(wx, wy + 3, '#c3cfdf', null, 0, -1.5); continue; }
+    if (x < 0 || y < 0 || x >= n || y >= n || !V[y][x]) { diamond(wx, wy + 3, TH_().fog, null, 0, -1.5); continue; }
     const tl = T(x, y);
     if (isWater(tl)) { diamond(wx, wy + WOFF, null, 'rgba(255,255,255,.07)', 1, 0.5); continue; }
     paintLandTile(x, y, wx, wy, climateOf(tl), tl);
   }
   drawRoads(n, V);
+  const grid = TH_().grid;
+  if (grid) { // sci-fi: a faint glowing outline around every explored land tile
+    ctx.save(); ctx.shadowColor = grid; ctx.shadowBlur = 4;
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (V[y][x] && !isWater(T(x, y))) diamond(wxOf(x, y), wyOf(x, y), null, grid, 0.8, 1);
+    ctx.restore();
+  }
 }
 
 /* particles */
@@ -4210,6 +4275,7 @@ function draw(now) {
   frameK = lastFrame ? Math.max(0.25, Math.min(4, (now - lastFrame) / 16.67)) : 1; lastFrame = now;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.fillStyle = bgGrad || '#0b2746'; ctx.fillRect(0, 0, W, H);
+  drawBackdrop(now);
   const menuOpen = !$('menu').hidden;
   const useDemo = !G || (G.over && menuOpen);
   if (useDemo && !demo) demo = makeDemo();
@@ -4240,14 +4306,14 @@ function draw(now) {
     drawWorld(now, useDemo);
   } finally { G = realG; cam = realCam; }
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  if (!postfx.render(camUsed, now)) { ctx.fillStyle = vignette; ctx.fillRect(0, 0, W, H); }
+  if (!postfx.render(camUsed, now)) { drawThemeOverlay(); ctx.fillStyle = vignette; ctx.fillRect(0, 0, W, H); }
 }
 
 /* ---------- shaders: a WebGL pass over the finished frame ---------- */
 // Bloom on bright highlights, a gentle colour grade, cloud shadows drifting over the world and a vignette.
 // The 2D canvas stays underneath for input and as the fallback when WebGL is missing or switched off.
 const postfx = (() => {
-  let gl = null, glc = null, progs = null, scene = null, fbs = [], quad = null, bw = 0, bh = 0, broken = false, last = 0, slow = 0, frames = 0;
+  let gl = null, glc = null, progs = null, scene = null, sceneSharp = false, fbs = [], quad = null, bw = 0, bh = 0, broken = false, last = 0, slow = 0, frames = 0;
   let on = (() => { try { return localStorage.getItem('polyweb-shaders') !== '0'; } catch (e) { return true; } })();
   const VS = 'attribute vec2 p; varying vec2 uv; void main() { uv = p * 0.5 + 0.5; gl_Position = vec4(p, 0.0, 1.0); }';
   const BRIGHT = `precision mediump float; varying vec2 uv; uniform sampler2D t;
@@ -4264,13 +4330,14 @@ const postfx = (() => {
       gl_FragColor = vec4(s, 1.0);
     }`;
   const FINAL = `precision mediump float; varying vec2 uv; uniform sampler2D t; uniform sampler2D b;
-    uniform vec3 cam; uniform vec2 view; uniform float time;
+    uniform vec3 cam; uniform vec2 view; uniform float time; uniform float theme; uniform float px;
     float h(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
     float n(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
       return mix(mix(h(i), h(i + vec2(1.0, 0.0)), f.x), mix(h(i + vec2(0.0, 1.0)), h(i + vec2(1.0, 1.0)), f.x), f.y); }
     float fbm(vec2 p) { float s = 0.0, a = 0.5; for (int k = 0; k < 4; k++) { s += a * n(p); p *= 2.03; a *= 0.5; } return s; }
     void main() {
-      vec3 c = texture2D(t, uv).rgb + texture2D(b, uv).rgb * 0.6;
+      bool sci = theme > 0.5 && theme < 1.5, fan = theme > 1.5 && theme < 2.5, old = theme > 2.5;
+      vec3 c = texture2D(t, uv).rgb + texture2D(b, uv).rgb * (sci ? 1.1 : 0.6);
       vec2 css = vec2(uv.x, 1.0 - uv.y) * view;
       vec2 world = (css - view * 0.5) / cam.z + cam.xy;
       float cl = fbm(world / 240.0 + vec2(time * 0.016, time * 0.006));
@@ -4279,7 +4346,18 @@ const postfx = (() => {
       float l = dot(c, vec3(0.299, 0.587, 0.114));
       c = mix(vec3(l), c, 1.1);
       c += vec3(0.03, 0.015, -0.02) * smoothstep(0.55, 1.0, l) + vec3(-0.012, 0.0, 0.02) * (1.0 - smoothstep(0.0, 0.35, l));
-      vec2 q = uv - 0.5; c *= 1.0 - dot(q, q) * 0.4;
+      if (sci) { // cool and electric, with faint scanlines
+        float g = dot(c, vec3(0.299, 0.587, 0.114));
+        c = mix(c, vec3(g) * vec3(0.7, 0.98, 1.3), 0.28) + vec3(0.0, 0.015, 0.045);
+        c *= 0.95 + 0.05 * sin(css.y * 2.094);
+      } else if (fan) { // warm golden light, gently softened like a painting
+        c = mix(c, c * vec3(1.13, 1.0, 0.76) + vec3(0.03, 0.015, 0.0), 0.65);
+        c = pow(max(c, 0.0), vec3(0.94));
+      } else if (old) { // a small palette and the lines of an old television
+        c = floor(c * 5.0 + 0.5) / 5.0;
+        c *= 0.8 + 0.2 * step(fract(css.y / px), 0.62);
+      }
+      vec2 q = uv - 0.5; c *= 1.0 - dot(q, q) * (fan ? 0.85 : old ? 0.7 : 0.4);
       gl_FragColor = vec4(c, 1.0);
     }`;
   function program(fs) {
@@ -4289,7 +4367,7 @@ const postfx = (() => {
     gl.bindAttribLocation(pr, 0, 'p'); gl.linkProgram(pr);
     if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(pr));
     const u = {};
-    for (const name of ['t', 'b', 'd', 'cam', 'view', 'time']) u[name] = gl.getUniformLocation(pr, name);
+    for (const name of ['t', 'b', 'd', 'cam', 'view', 'time', 'theme', 'px']) u[name] = gl.getUniformLocation(pr, name);
     return { pr, u };
   }
   function texture() {
@@ -4337,8 +4415,13 @@ const postfx = (() => {
     if (!on || broken) { show(false); return false; }
     try {
       if (!gl) init();
-      if (glc.width !== cv.width || glc.height !== cv.height) sizeTo(cv.width, cv.height);
+      const th = TH_(), sharp = th.pixel > 1, ow = sharp ? Math.round(W * (window.devicePixelRatio || 1)) : cv.width, oh = sharp ? Math.round(H * (window.devicePixelRatio || 1)) : cv.height;
+      if (glc.width !== ow || glc.height !== oh) sizeTo(ow, oh);
       gl.bindTexture(gl.TEXTURE_2D, scene);
+      if (sharp !== sceneSharp) { // big pixels stay crisp when the shader scales the frame up
+        sceneSharp = sharp; const f = sharp ? gl.NEAREST : gl.LINEAR;
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, f); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, f);
+      }
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, cv);
       pass(progs.bright, fbs[0], bw, bh, scene);
       pass(progs.blur, fbs[1], bw, bh, fbs[0].tx, u => gl.uniform2f(u.d, 1 / bw, 0));
@@ -4346,12 +4429,13 @@ const postfx = (() => {
       pass(progs.final, null, glc.width, glc.height, scene, u => {
         gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, fbs[0].tx); gl.uniform1i(u.b, 1);
         gl.uniform3f(u.cam, c.x, c.y, c.z); gl.uniform2f(u.view, W, H); gl.uniform1f(u.time, reduceMotion ? 0 : now / 1000);
+        gl.uniform1f(u.theme, th.fx); gl.uniform1f(u.px, th.pixel > 1 ? th.pixel : 3);
       });
       show(true);
       // if frames crawl with the shader on, switch it off for this session so the game stays smooth
       const dt = now - last; last = now;
       if (dt > 0 && dt < 1000) { frames++; slow = slow * 0.97 + (dt > 50 ? 0.03 : 0); }
-      if (frames > 120 && slow > 0.8) { on = false; show(false); toast('Shaders switched off to keep the game smooth. Turn them back on in the Game menu.'); }
+      if (frames > 120 && slow > 0.8) { on = false; show(false); toast('Shaders switched off to keep the game smooth. Turn them back on in Settings.'); }
       return true;
     } catch (e) { broken = true; show(false); return false; }
   }
@@ -4451,7 +4535,7 @@ cv.addEventListener('wheel', e => { // mouse wheels and trackpads both glide to 
 addEventListener('resize', resize);
 addEventListener('keydown', e => {
   if (e.key === 'Escape') {
-    for (const id of ['help', 'tech-pop', 'tech', 'game-menu']) if (!$(id).hidden) { $(id).hidden = true; if (id === 'tech') $('tech-pop').hidden = true; return; }
+    for (const id of ['help', 'prefs', 'tech-pop', 'tech', 'game-menu']) if (!$(id).hidden) { $(id).hidden = true; if (id === 'tech') $('tech-pop').hidden = true; return; }
     if (G) select(null);
     return;
   }
@@ -4702,14 +4786,39 @@ $('btn-resume').onclick = () => showGame(true);
 $('btn-howto').onclick = () => { $('help').hidden = false; };
 $('btn-game').onclick = () => { if (!G) return; sfx('click'); renderGameMenu(); $('game-menu').hidden = false; };
 $('gm-resume').onclick = () => { $('game-menu').hidden = true; };
-$('gm-sound').onclick = () => {
+$('gm-help').onclick = () => { $('help').hidden = false; };
+
+/* settings: the style of the whole game, sound and shaders, kept on this device */
+function renderPrefs() {
+  const grid = $('theme-grid');
+  if (!grid.children.length) grid.innerHTML = Object.entries(THEMES).map(([id, t]) => `
+    <button class="theme-card" data-theme="${id}" role="radio">
+      <span class="tc-view" style="--s0:${t.depth[0]};--s1:${t.depth[2]};--s2:${t.depth[5]};--b0:${t.bg[0]}"><i></i><i></i><i></i><span class="tc-btn">Play</span></span>
+      <b>${t.name}</b><span class="tc-blurb">${t.blurb}</span>
+    </button>`).join('');
+  for (const b of grid.children) { const on = b.dataset.theme === theme; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); }
+  $('set-sound').textContent = muted ? 'Sound: off' : 'Sound: on';
+  $('set-fx').textContent = !postfx.available ? 'Shaders: unavailable' : postfx.on ? 'Shaders: on' : 'Shaders: off';
+  $('set-fx').disabled = !postfx.available;
+}
+function openPrefs() { sfx('click'); renderPrefs(); $('prefs').hidden = false; }
+const closePrefs = () => { $('prefs').hidden = true; };
+$('btn-settings').onclick = openPrefs;
+$('gm-settings').onclick = openPrefs;
+$('btn-prefs-close').onclick = closePrefs;
+$('btn-prefs-done').onclick = closePrefs;
+$('theme-grid').addEventListener('click', e => {
+  const b = e.target.closest('.theme-card');
+  if (!b || b.dataset.theme === theme) return;
+  setTheme(b.dataset.theme); sfx('click'); renderPrefs();
+});
+$('set-sound').onclick = () => {
   muted = !muted;
   try { localStorage.setItem('polyweb-muted', muted ? '1' : '0'); } catch (e) { /* ignore */ }
   if (!muted) sfx('click');
-  renderGameMenu();
+  renderPrefs();
 };
-$('gm-help').onclick = () => { $('help').hidden = false; };
-$('gm-fx').onclick = () => { postfx.toggle(); sfx('click'); renderGameMenu(); };
+$('set-fx').onclick = () => { postfx.toggle(); sfx('click'); renderPrefs(); };
 let confirmBreak = -1;
 $('gm-tribes').addEventListener('click', e => {
   const b = e.target.closest('button.dip');
@@ -5400,6 +5509,7 @@ $('gm-invite').onclick = () => { $('game-menu').hidden = true; showShare(false);
 $('gm-seat').onclick = () => { $('game-menu').hidden = true; showShare(true); };
 
 /* ---------- boot ---------- */
+document.body.dataset.theme = theme;
 resize(); showScreen('home'); requestAnimationFrame(draw);
 // Keep a game in progress when this page is hot-reloaded inside an artifact viewer.
 window.claude?.hot?.snapshot?.(() => (G && !G.over && !editing ? { G } : {}));

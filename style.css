@@ -342,3 +342,187 @@ button.dip:disabled{opacity:.55;cursor:default}
   #turn-of .dots::after{animation:none;content:"..."}
   #toast,.btn,.round .disc,.tribe-card{transition:none}
 }
+
+/* ---------- Settings ---------- */
+#theme-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:16px}
+.theme-card{display:grid;align-content:start;gap:3px;text-align:left;padding:8px 8px 10px;border:0;border-radius:14px;background:var(--panel-2);color:var(--text);
+  font:15px/1.3 var(--font-body);box-shadow:0 0 0 2px rgba(255,255,255,.08);transition:transform .1s,box-shadow .1s}
+.theme-card:hover{transform:translateY(-2px)}
+.theme-card.on{box-shadow:0 0 0 3px var(--gold),0 6px 18px rgba(0,0,0,.35)}
+.theme-card b{font:400 19px/1.1 var(--font-display);letter-spacing:.4px;margin-top:4px}
+.theme-card.on b::after{content:" ✓";color:var(--gold)}
+.tc-blurb{font-size:12.5px;color:var(--muted)}
+.tc-view{position:relative;display:block;height:78px;border-radius:9px;overflow:hidden;
+  background:radial-gradient(ellipse at 45% 70%,var(--s0) 0 18%,var(--s1) 38%,var(--s2) 75%,var(--b0))}
+.tc-view i{position:absolute;width:46px;height:23px;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);background:#79c75a}
+.tc-view i:nth-child(1){left:18%;top:38%}.tc-view i:nth-child(2){left:36%;top:52%;background:#5fae4a}.tc-view i:nth-child(3){left:12%;top:63%;background:#8fd46a}
+.tc-btn{position:absolute;right:8px;bottom:8px;font:400 13px/1 var(--font-display);color:#fff;background:var(--blue);border-radius:8px;padding:6px 10px 5px;box-shadow:0 3px 0 var(--blue-edge)}
+.prefs-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.prefs-row .btn{font-size:16px;padding:12px 10px 11px}
+.prefs-note{font-size:13px;margin:12px 0 0}
+#prefs .popup{padding-top:18px}
+@media (max-width:420px){.tc-blurb{font-size:11.5px}.theme-card b{font-size:17px}.tc-view{height:64px}}
+
+/* ---------- Styles: Sci-fi, Fantasy and Nostalgic ----------
+   [data-theme] sets the colours and fonts (on the page, and on each preview card in Settings);
+   body[data-theme] reshapes the pieces. */
+[data-theme="scifi"]{
+  --bg:#03050f; --panel:#0a1233; --panel-2:#0f1a44; --line:#2b3f8a; --text:#e6fbff; --muted:#8db3d6;
+  --gold:#ffe14a; --gold-ink:#1a1400; --blue:#07405e; --blue-edge:#36f0ff; --green:#06483c; --green-edge:#3dffb0;
+  --dark:#111838; --dark-edge:#6676e8; --good:#3dffb0; --bad:#ff4f8b;
+  --font-display:"Orbitron","Eurostile","Arial Black",system-ui,sans-serif;
+  --font-body:"Exo 2",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+[data-theme="fantasy"]{
+  --bg:#160d05; --panel:#3a2514; --panel-2:#4a311b; --line:#8a6a35; --text:#f8ead0; --muted:#d2b88c;
+  --gold:#f2c75c; --gold-ink:#3a2200; --blue:#2c6a5e; --blue-edge:#163b34; --green:#5f8a2a; --green-edge:#33501a;
+  --dark:#5b3a1f; --dark-edge:#2c1b0c; --good:#a8e070; --bad:#ff7a5c;
+  --font-display:"Cinzel","Trajan Pro","Times New Roman",serif;
+  --font-body:"Alegreya",Georgia,"Times New Roman",serif;
+}
+[data-theme="nostalgic"]{
+  --bg:#000; --panel:#10108a; --panel-2:#1c1cb0; --line:#fff; --text:#fff; --muted:#bcbcbc;
+  --gold:#fcd800; --gold-ink:#000; --blue:#2038ec; --blue-edge:#000; --green:#00a800; --green-edge:#000;
+  --dark:#585858; --dark-edge:#000; --good:#58f858; --bad:#f83800;
+  --font-display:"Pixelify Sans","Courier New",monospace;
+  --font-body:"Pixelify Sans","Courier New",monospace;
+}
+
+/* preview cards wear their own style */
+.theme-card[data-theme="scifi"]{border-radius:0;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);
+  background:linear-gradient(#0f1a44,#070c26);box-shadow:inset 0 0 0 1px rgba(54,240,255,.45)}
+.theme-card[data-theme="scifi"].on{box-shadow:inset 0 0 0 3px var(--gold)}
+.theme-card[data-theme="scifi"] b{text-transform:uppercase;font-size:15px;letter-spacing:2px}
+.theme-card[data-theme="scifi"] .tc-view{border-radius:0}
+.theme-card[data-theme="scifi"] .tc-view i{background:#2a8f7a;box-shadow:none;outline:0}
+.theme-card[data-theme="scifi"] .tc-view::before{content:"";position:absolute;inset:0;
+  background:radial-gradient(1px 1px at 20% 20%,#fff,transparent),radial-gradient(1px 1px at 70% 15%,#7ff3ff,transparent),radial-gradient(1px 1px at 85% 40%,#ff7ae6,transparent),radial-gradient(1px 1px at 50% 8%,#fff,transparent)}
+.theme-card[data-theme="scifi"] .tc-btn{border-radius:0;background:rgba(7,64,94,.7);box-shadow:inset 0 0 0 2px #36f0ff,0 0 10px rgba(54,240,255,.6);text-transform:uppercase;font-size:10px;letter-spacing:2px}
+.theme-card[data-theme="fantasy"]{border-radius:8px;background:repeating-linear-gradient(92deg,rgba(0,0,0,.08) 0 3px,transparent 3px 9px),linear-gradient(#4a311b,#38230f);
+  box-shadow:inset 0 0 0 2px #b8903f}
+.theme-card[data-theme="fantasy"].on{box-shadow:inset 0 0 0 2px #b8903f,0 0 0 3px var(--gold)}
+.theme-card[data-theme="fantasy"] .tc-view{border-radius:4px;box-shadow:inset 0 0 0 2px #b8903f,inset 0 0 18px rgba(40,20,0,.6)}
+.theme-card[data-theme="fantasy"] .tc-view i{background:#8fb04a}
+.theme-card[data-theme="fantasy"] .tc-btn{border-radius:4px;box-shadow:inset 0 0 0 1px #e8c46a,0 3px 0 var(--blue-edge);font-weight:700}
+.theme-card[data-theme="nostalgic"]{border-radius:0;background:#10108a;box-shadow:inset 0 0 0 3px #fff;font-size:14px}
+.theme-card[data-theme="nostalgic"].on{box-shadow:inset 0 0 0 3px #fff,0 0 0 3px var(--gold)}
+.theme-card[data-theme="nostalgic"] b{font-family:"Press Start 2P",monospace;font-size:12px;line-height:1.4}
+.theme-card[data-theme="nostalgic"] .tc-view{border-radius:0;background:linear-gradient(var(--s0) 0 25%,var(--s1) 25% 55%,var(--s2) 55%)}
+.theme-card[data-theme="nostalgic"] .tc-view i{clip-path:none;width:28px;height:14px;background:#00a800;box-shadow:4px 4px 0 #000}
+.theme-card[data-theme="nostalgic"] .tc-btn{border-radius:0;box-shadow:3px 3px 0 #000;font-family:"Press Start 2P",monospace;font-size:9px;padding:6px 8px}
+
+/* Sci-fi: dark glass, neon edges, cut corners */
+body[data-theme="scifi"] .btn{border-radius:0;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);
+  text-transform:uppercase;font-size:15px;letter-spacing:2.5px;font-weight:700;padding:15px 22px 14px;text-shadow:0 0 8px var(--edge);
+  box-shadow:inset 0 0 0 2px var(--edge),inset 0 0 22px color-mix(in srgb,var(--edge) 30%,transparent)}
+body[data-theme="scifi"] .btn:active:not(:disabled){transform:translateY(1px);box-shadow:inset 0 0 0 2px var(--edge),inset 0 0 30px color-mix(in srgb,var(--edge) 55%,transparent)}
+body[data-theme="scifi"] .btn.red{background:#4a0c2a;--edge:#ff4f8b}
+body[data-theme="scifi"] .popup,body[data-theme="scifi"] #settings,body[data-theme="scifi"] #info,body[data-theme="scifi"] #editor-bar{border-radius:0;border:1px solid rgba(54,240,255,.55);
+  background:linear-gradient(rgba(14,26,68,.95),rgba(4,8,28,.96));box-shadow:inset 0 0 40px rgba(54,240,255,.1),0 0 30px rgba(54,240,255,.18);
+  clip-path:polygon(18px 0,100% 0,100% calc(100% - 18px),calc(100% - 18px) 100%,0 100%,0 18px)}
+body[data-theme="scifi"] .popup h2,body[data-theme="scifi"] .popup h3,body[data-theme="scifi"] .screen-title{text-transform:uppercase;letter-spacing:3px;font-size:22px;font-weight:700;
+  color:#bff8ff;text-shadow:0 0 12px rgba(54,240,255,.7)}
+body[data-theme="scifi"] .set-label,body[data-theme="scifi"] #info-title{text-transform:uppercase;letter-spacing:2px;font-size:14px;font-weight:700}
+body[data-theme="scifi"] #info-title{font-size:16px}
+body[data-theme="scifi"] .logo{font-weight:900;font-size:clamp(38px,11vw,64px);letter-spacing:6px;color:#e9fdff;
+  text-shadow:0 0 6px #36f0ff,0 0 22px #36f0ff,0 0 44px #ff3fd8}
+body[data-theme="scifi"] .tag{text-transform:uppercase;letter-spacing:3px;font-size:13px;color:#7ff3ff}
+body[data-theme="scifi"] .round .disc,body[data-theme="scifi"] .act .disc{background:radial-gradient(circle at 50% 40%,#11306a,#050c26);
+  box-shadow:0 0 0 2px #36f0ff,0 0 16px rgba(54,240,255,.55)}
+body[data-theme="scifi"] .round svg{stroke:#9ff8ff}
+body[data-theme="scifi"] .round svg circle{fill:#9ff8ff}
+body[data-theme="scifi"] .act .glyph{color:#9ff8ff}
+body[data-theme="scifi"] .round:active:not(:disabled) .disc,body[data-theme="scifi"] .act:active:not(:disabled) .disc{box-shadow:0 0 0 2px #36f0ff,0 0 26px rgba(54,240,255,.9)}
+body[data-theme="scifi"] #btn-end.ready .disc{background:radial-gradient(circle at 50% 40%,#5a1650,#22052a);box-shadow:0 0 0 2px #ff5ce8,0 0 22px rgba(255,92,232,.8);animation:none}
+body[data-theme="scifi"] .act .cost{background:#050c26;border-color:#36f0ff}
+body[data-theme="scifi"] .round .lbl,body[data-theme="scifi"] .act .lbl,body[data-theme="scifi"] .stat .value{text-shadow:0 0 8px rgba(54,240,255,.8)}
+body[data-theme="scifi"] .round .lbl,body[data-theme="scifi"] .stat .label{text-transform:uppercase;letter-spacing:1.5px;font-size:11px}
+body[data-theme="scifi"] .stat .value{font-size:24px;font-weight:700}
+body[data-theme="scifi"] .act .lbl{font-size:10.5px;letter-spacing:.5px}
+body[data-theme="scifi"] .seg button{border-radius:0;box-shadow:inset 0 0 0 1px var(--dark-edge);font-size:12px;letter-spacing:1px;text-transform:uppercase}
+body[data-theme="scifi"] .seg button.on{background:var(--blue);box-shadow:inset 0 0 0 2px var(--blue-edge),0 0 10px rgba(54,240,255,.4)}
+body[data-theme="scifi"] .tribe-card{border-radius:0;background:linear-gradient(#0f1a44,#070c26);box-shadow:inset 0 0 0 1px rgba(54,240,255,.35)}
+body[data-theme="scifi"] .tribe-card b{font-size:16px;letter-spacing:1.5px;text-transform:uppercase}
+body[data-theme="scifi"] .overlay{background:rgba(1,2,12,.78)}
+body[data-theme="scifi"] .overlay.solid{background:var(--bg)}
+body[data-theme="scifi"] #menu{background:radial-gradient(ellipse at center,rgba(2,4,20,.3),rgba(1,2,12,.85))}
+body[data-theme="scifi"] .overlay.deep{background:radial-gradient(circle at 50% 50%,#0e1a52,#02030c 70%)}
+body[data-theme="scifi"] #toast,body[data-theme="scifi"] #turn-of{border-radius:0;background:rgba(4,8,30,.9);border:1px solid rgba(54,240,255,.6)}
+body[data-theme="scifi"] .x{border-radius:0;background:transparent;box-shadow:inset 0 0 0 1px #36f0ff;color:#9ff8ff}
+
+/* Fantasy: carved wood, gold trim and old lettering */
+body[data-theme="fantasy"] .btn{border-radius:6px;font-weight:700;font-size:18px;letter-spacing:1px;text-shadow:0 2px 0 rgba(0,0,0,.45);
+  background-image:linear-gradient(rgba(255,255,255,.16),rgba(0,0,0,.12));
+  box-shadow:inset 0 0 0 2px #d6ae58,inset 0 0 0 4px rgba(0,0,0,.25),0 4px 0 var(--edge),0 8px 18px rgba(0,0,0,.35)}
+body[data-theme="fantasy"] .btn:active:not(:disabled){box-shadow:inset 0 0 0 2px #d6ae58,0 1px 0 var(--edge)}
+body[data-theme="fantasy"] .btn.red{background-color:#8f2a20;--edge:#4f140e}
+body[data-theme="fantasy"] .popup,body[data-theme="fantasy"] #settings,body[data-theme="fantasy"] #info,body[data-theme="fantasy"] #editor-bar{border-radius:10px;border:3px solid #c9a24a;
+  background:repeating-linear-gradient(91deg,rgba(0,0,0,.07) 0 2px,transparent 2px 11px),radial-gradient(ellipse at 50% 0,#56391f,#2c1a0b);
+  box-shadow:inset 0 0 0 2px #5a3a1a,inset 0 0 44px rgba(0,0,0,.5),0 20px 60px rgba(0,0,0,.6)}
+body[data-theme="fantasy"] .popup h2,body[data-theme="fantasy"] .popup h3,body[data-theme="fantasy"] .screen-title{font-weight:700;letter-spacing:1.5px;color:#f6d27a;text-shadow:0 2px 0 #3a2208,0 0 16px rgba(242,199,92,.25)}
+body[data-theme="fantasy"] .popup h2::after,body[data-theme="fantasy"] .screen-title::after{content:"";display:block;width:120px;height:2px;margin:6px auto 0;background:linear-gradient(90deg,transparent,#c9a24a,transparent)}
+body[data-theme="fantasy"] .popup.wide h2::after{margin-left:0}
+body[data-theme="fantasy"] .set-label,body[data-theme="fantasy"] #info-title{font-weight:700;color:#f6d27a}
+body[data-theme="fantasy"] .logo{font-weight:900;font-size:clamp(46px,12vw,76px);letter-spacing:3px;color:#ffdc80;
+  text-shadow:none;background:linear-gradient(#fff2c2,#f2c75c 45%,#b07a1e);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 3px 0 #4a2a08) drop-shadow(0 8px 14px rgba(0,0,0,.6))}
+body[data-theme="fantasy"] .tag{font-style:italic;font-size:17px;color:#f2dfb8}
+body[data-theme="fantasy"] .round .disc,body[data-theme="fantasy"] .act .disc{background:radial-gradient(circle at 50% 35%,#fff6dc,#dcc087);box-shadow:0 0 0 3px #8a6a35,0 4px 0 #4a2e12,0 8px 16px rgba(0,0,0,.45)}
+body[data-theme="fantasy"] .round svg{stroke:#4a2e12}
+body[data-theme="fantasy"] .round svg circle{fill:#4a2e12}
+body[data-theme="fantasy"] .act .glyph{color:#4a2e12}
+body[data-theme="fantasy"] .round:active:not(:disabled) .disc,body[data-theme="fantasy"] .act:active:not(:disabled) .disc{box-shadow:0 0 0 3px #8a6a35,0 1px 0 #4a2e12}
+body[data-theme="fantasy"] #btn-end.ready .disc{background:radial-gradient(circle at 50% 35%,#fff0b0,#e8a920);box-shadow:0 0 0 3px #8a5a10,0 4px 0 #5a3a08}
+body[data-theme="fantasy"] .act .cost{background:#3a2514;border-color:#d6ae58}
+body[data-theme="fantasy"] .round .lbl,body[data-theme="fantasy"] .act .lbl,body[data-theme="fantasy"] .stat .value{font-weight:700}
+body[data-theme="fantasy"] .act .lbl{font-size:12px}
+body[data-theme="fantasy"] .seg button{border-radius:5px;box-shadow:inset 0 0 0 1px #8a6a35,0 3px 0 var(--dark-edge);font-weight:700;font-size:14px}
+body[data-theme="fantasy"] .seg button.on{box-shadow:inset 0 0 0 2px #e8c46a,0 3px 0 var(--blue-edge)}
+body[data-theme="fantasy"] .tribe-card{border-radius:8px;background:radial-gradient(ellipse at 50% 0,#56391f,#2c1a0b);box-shadow:inset 0 0 0 2px #b8903f,0 10px 24px rgba(0,0,0,.45)}
+body[data-theme="fantasy"] .tribe-card b{font-weight:700;font-size:19px}
+body[data-theme="fantasy"] .overlay{background:rgba(20,10,2,.74)}
+body[data-theme="fantasy"] .overlay.solid{background:var(--bg)}
+body[data-theme="fantasy"] #menu{background:radial-gradient(ellipse at center,rgba(30,14,2,.3),rgba(14,6,0,.85))}
+body[data-theme="fantasy"] .overlay.deep{background:radial-gradient(circle at 50% 50%,#4a3118,#140a03 70%)}
+body[data-theme="fantasy"] #toast,body[data-theme="fantasy"] #turn-of{background:rgba(44,26,11,.94);border:2px solid #c9a24a}
+body[data-theme="fantasy"] .x{background:#5b3a1f;box-shadow:inset 0 0 0 2px #c9a24a,0 3px 0 #2c1b0c}
+
+/* Nostalgic: a 1980s console, with square buttons, hard shadows and pixel lettering */
+body[data-theme="nostalgic"]{-webkit-font-smoothing:none;font-smooth:never}
+body[data-theme="nostalgic"] #c{image-rendering:pixelated;image-rendering:crisp-edges}
+body[data-theme="nostalgic"] .act img,body[data-theme="nostalgic"] .tribe-card img,body[data-theme="nostalgic"] .pi-head img,body[data-theme="nostalgic"] .adm-prices img{image-rendering:pixelated}
+body[data-theme="nostalgic"] .btn{border-radius:0;font-size:18px;letter-spacing:1px;text-shadow:2px 2px 0 #000;border:3px solid #000;
+  box-shadow:inset -3px -3px 0 rgba(0,0,0,.35),inset 3px 3px 0 rgba(255,255,255,.3),5px 5px 0 #000;transition:none}
+body[data-theme="nostalgic"] .btn:active:not(:disabled){transform:translate(4px,4px);box-shadow:inset 3px 3px 0 rgba(0,0,0,.35),1px 1px 0 #000}
+body[data-theme="nostalgic"] .btn.red{background:#d82800}
+body[data-theme="nostalgic"] .popup,body[data-theme="nostalgic"] #settings,body[data-theme="nostalgic"] #info,body[data-theme="nostalgic"] #editor-bar{border-radius:0;background:#10108a;border:4px solid #fff;
+  box-shadow:0 0 0 4px #000,10px 10px 0 4px #000}
+body[data-theme="nostalgic"] .popup h2,body[data-theme="nostalgic"] .popup h3,body[data-theme="nostalgic"] .screen-title{font-family:"Press Start 2P",monospace;font-size:18px;line-height:1.5;color:var(--gold);text-shadow:3px 3px 0 #000}
+body[data-theme="nostalgic"] .logo{font-family:"Press Start 2P",monospace;font-size:clamp(28px,8.5vw,52px);line-height:1.2;color:#fcd800;letter-spacing:0;
+  text-shadow:4px 4px 0 #d82800,8px 8px 0 #000}
+body[data-theme="nostalgic"] .tag{font-size:16px;text-shadow:2px 2px 0 #000}
+body[data-theme="nostalgic"] .tag::after{content:"_";animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+body[data-theme="nostalgic"] .round .disc,body[data-theme="nostalgic"] .act .disc{border-radius:0;background:#fcfcfc;box-shadow:inset -4px -4px 0 #bcbcbc,0 0 0 3px #000,5px 5px 0 3px #000}
+body[data-theme="nostalgic"] .act img{border-radius:0}
+body[data-theme="nostalgic"] .round svg{stroke:#000;stroke-linecap:square;stroke-linejoin:miter}
+body[data-theme="nostalgic"] .round svg circle{fill:#000}
+body[data-theme="nostalgic"] .act .glyph{color:#000}
+body[data-theme="nostalgic"] .round:active:not(:disabled) .disc,body[data-theme="nostalgic"] .act:active:not(:disabled) .disc{transform:translate(4px,4px);box-shadow:inset -4px -4px 0 #bcbcbc,0 0 0 3px #000}
+body[data-theme="nostalgic"] #btn-end.ready .disc{background:#fcd800;box-shadow:inset -4px -4px 0 #c88800,0 0 0 3px #000,5px 5px 0 3px #000;animation:blink 1s steps(1) infinite alternate}
+body[data-theme="nostalgic"] .act .cost{border-radius:0;background:#000;border-color:#fcd800}
+body[data-theme="nostalgic"] .round .lbl,body[data-theme="nostalgic"] .act .lbl,body[data-theme="nostalgic"] .stat .value{text-shadow:2px 2px 0 #000}
+body[data-theme="nostalgic"] .stat .value{font-family:"Press Start 2P",monospace;font-size:18px;line-height:1.4}
+body[data-theme="nostalgic"] .seg button{border-radius:0;box-shadow:3px 3px 0 #000}
+body[data-theme="nostalgic"] .seg button.on{background:var(--blue);box-shadow:inset 0 0 0 2px #fff,3px 3px 0 #000}
+body[data-theme="nostalgic"] .tribe-card{border-radius:0;background:#10108a;box-shadow:inset 0 0 0 3px #fff,6px 6px 0 #000}
+body[data-theme="nostalgic"] .overlay{background:rgba(0,0,0,.72)}
+body[data-theme="nostalgic"] .overlay.solid,body[data-theme="nostalgic"] .overlay.deep{background:#000}
+body[data-theme="nostalgic"] #menu{background:rgba(0,0,0,.45)}
+body[data-theme="nostalgic"] #toast,body[data-theme="nostalgic"] #turn-of{border-radius:0;background:#000;border:3px solid #fff}
+body[data-theme="nostalgic"] .x{border-radius:0;background:#d82800;box-shadow:3px 3px 0 #000}
+body[data-theme="nostalgic"] .chips span,body[data-theme="nostalgic"] .pips i,body[data-theme="nostalgic"] #info-text .skills span{border-radius:0}
+@media (prefers-reduced-motion:reduce){body[data-theme="nostalgic"] .tag::after,body[data-theme="nostalgic"] #btn-end.ready .disc{animation:none}}
+body[data-theme="scifi"] .act .disc{background:radial-gradient(circle at 50% 38%,#3a6fb0,#0d1d4a 75%)}
+body[data-theme="scifi"] .prefs-row .btn{font-size:12.5px;letter-spacing:1.5px;padding:15px 8px 14px}
+body[data-theme="scifi"] .seg button span{text-transform:none;letter-spacing:.3px;font-family:var(--font-body)}
