@@ -4,7 +4,11 @@
 /* ---------- data ---------- */
 const TW = 64, TH = 32, LH = 10, WOFF = 7; // tile size, land thickness, how far water sits below land
 const SAVE_KEY = 'polyweb-save-v3', SLOTS = 3; // one saved game per slot, under SAVE_KEY-1 .. SAVE_KEY-3
-const MAX_LEVEL = 8, AI_DELAY = 170;
+const AI_DELAY = 170; // cities have no level cap
+// City tiers: the look and the badge change at levels 9, 13, 20 and 30.
+const cityTier = lv => (lv >= 30 ? 4 : lv >= 20 ? 3 : lv >= 13 ? 2 : lv >= 9 ? 1 : 0);
+const TIER_RING = [null, '#cd7f32', '#d8dde6', '#ffcf3f', '#8ff4ff'];
+const TIER_NAME = ['', 'Town', 'City', 'Metropolis', 'Wonder city'];
 
 const TRIBES = [
   { name: 'Zephyr',  color: '#4a8cff', tech: 'riding',       unit: 'warrior', about: 'Horse-lords of the open plains' },
@@ -34,7 +38,21 @@ const UNITS = {
   mindbender: { name: 'Mind Bender', icon: '🔮', cost: 5, atk: 0,   def: 1, hp: 10, mv: 1, range: 1, tech: 'philosophy',  skills: ['heal', 'convert'] },
   catapult:   { name: 'Catapult',    icon: '🎯', cost: 8, atk: 4,   def: 0, hp: 10, mv: 1, range: 3, tech: 'mathematics', skills: [] },
   knight:     { name: 'Knight',      icon: '🏇', cost: 8, atk: 3,   def: 1, hp: 10, mv: 3, range: 1, tech: 'chivalry',    skills: ['dash', 'persist', 'fortify'] },
-  giant:      { name: 'Giant',       icon: '🗿', cost: 0, atk: 5,   def: 4, hp: 40, mv: 1, range: 1, tech: null, train: false, skills: [] },
+  giant:      { name: 'Giant',       icon: '🗿', cost: 0, atk: 5,   def: 4, hp: 40, mv: 1, range: 1, tech: null, train: false, super: true, skills: [] },
+  // every tribe's own super unit, granted by a city reward from level 5
+  stormlord:  { name: 'Storm Lord',  icon: '🌩️', cost: 0, atk: 4, def: 3, hp: 35, mv: 3, range: 1, tech: null, train: false, super: true, skills: ['dash', 'escape'] },
+  greatbear:  { name: 'Great Bear',  icon: '🐻', cost: 0, atk: 6, def: 3, hp: 35, mv: 2, range: 1, tech: null, train: false, super: true, skills: ['dash', 'persist'] },
+  jungletitan:{ name: 'Jungle Titan', icon: '🗿', cost: 0, atk: 5, def: 4, hp: 40, mv: 1, range: 1, tech: null, train: false, super: true, skills: ['dash', 'heal'] },
+  suncolossus:{ name: 'Sun Colossus', icon: '☀️', cost: 0, atk: 5, def: 5, hp: 40, mv: 1, range: 1, tech: null, train: false, super: true, skills: ['dash', 'fortify'] },
+  stonegiant: { name: 'Stone Giant', icon: '🪨', cost: 0, atk: 5, def: 6, hp: 45, mv: 1, range: 1, tech: null, train: false, super: true, skills: ['fortify'] },
+  mammoth:    { name: 'Ice Mammoth', icon: '🦣', cost: 0, atk: 6, def: 4, hp: 40, mv: 2, range: 1, tech: null, train: false, super: true, skills: ['dash'] },
+  magmatitan: { name: 'Magma Titan', icon: '🌋', cost: 0, atk: 7, def: 3, hp: 35, mv: 1, range: 1, tech: null, train: false, super: true, skills: ['dash', 'persist'] },
+  spiritdragon:{ name: 'Spirit Dragon', icon: '🐲', cost: 0, atk: 5, def: 3, hp: 30, mv: 3, range: 2, tech: null, train: false, super: true, skills: ['dash', 'flying'] },
+  gianttoad:  { name: 'Giant Toad',  icon: '🐸', cost: 0, atk: 5, def: 4, hp: 40, mv: 2, range: 1, tech: null, train: false, super: true, skills: ['dash', 'amphibious'] },
+  crystalcolossus:{ name: 'Crystal Colossus', icon: '💎', cost: 0, atk: 4, def: 6, hp: 40, mv: 1, range: 2, tech: null, train: false, super: true, skills: ['fortify'] },
+  seatitan:   { name: 'Sea Titan',   icon: '🔱', cost: 0, atk: 6, def: 4, hp: 40, mv: 2, range: 1, tech: null, train: false, super: true, skills: ['dash', 'amphibious'] },
+  warengine:  { name: 'War Engine',  icon: '🚂', cost: 0, atk: 6, def: 5, hp: 40, mv: 2, range: 2, tech: null, train: false, super: true, skills: [] },
+  eldertreant:{ name: 'Elder Treant', icon: '🌳', cost: 0, atk: 5, def: 5, hp: 45, mv: 1, range: 1, tech: null, train: false, super: true, skills: ['fortify', 'heal'] },
   horsearcher:{ name: 'Horse Archer', icon: '🏹', cost: 7, atk: 2,  def: 1, hp: 10, mv: 3, range: 2, tech: 'horsemanship', skills: ['dash', 'escape'] },
   paladin:    { name: 'Paladin',     icon: '🛡️', cost: 9, atk: 3,   def: 4, hp: 20, mv: 1, range: 1, tech: 'steelworking', skills: ['dash', 'fortify'] },
   trebuchet:  { name: 'Trebuchet',   icon: '🪨', cost: 11, atk: 5,  def: 0, hp: 10, mv: 1, range: 3, tech: 'ballistics',   skills: [] },
@@ -52,9 +70,12 @@ const BOATS = [
   { name: 'Ship',       icon: '🚢', atk: 2, def: 2, mv: 3, range: 2, skills: ['dash'], cost: 5, tech: 'sailing' },
   { name: 'Battleship', icon: '⚓', atk: 4, def: 3, mv: 3, range: 2, skills: ['dash'], cost: 15, tech: 'navigation' },
 ];
+const SUPER_OF = ['stormlord', 'greatbear', 'jungletitan', 'suncolossus', 'stonegiant', 'mammoth', 'magmatitan', 'spiritdragon', 'gianttoad', 'crystalcolossus', 'seatitan', 'warengine', 'eldertreant'];
+const superFor = tribe => SUPER_OF[tribe] || 'giant';
 const SKILL_INFO = {
   dash: 'Dash: can attack after moving', escape: 'Escape: can move after attacking', persist: 'Persist: attacks again after a kill, a quarter weaker each time',
   fortify: 'Fortify: defence bonus in cities', heal: 'Heal: mends nearby friends', convert: 'Convert: wins enemies over',
+  flying: 'Flying: forests and mountains never stop it, and it can cross mountains',
   amphibious: 'Amphibious: wades into water and fights there without a boat', aquatic: 'Aquatic: lives in the water (and in your cities)',
 };
 
@@ -542,7 +563,7 @@ function combatCalc(a, d, dist) {
 function reach(u, prev) {
   if (!canMove(u)) return [];
   const p = u.owner, startW = afloat(u), mv = stats(u).mv, swim = swims(u), aquatic = has(u, 'aquatic');
-  const woods = hasTech(p, 'wildspeak'), rail = hasTech(p, 'railways') ? 1 / 3 : 0.5;
+  const woods = hasTech(p, 'wildspeak'), rail = hasTech(p, 'railways') ? 1 / 3 : 0.5, fly = has(u, 'flying');
   const zoc = new Set();
   for (const e of G.units) if (hostile(e.owner, p)) for (const [dx, dy] of DIRS) zoc.add((e.x + dx) + ',' + (e.y + dy));
   const roadish = (x, y) => { const t = T(x, y); return !!t.road || (!!t.b && t.b.kind === 'city'); };
@@ -558,7 +579,7 @@ function reach(u, prev) {
       const tl = T(x, y), w = isWater(tl);
       const ownCity = !!tl.b && tl.b.kind === 'city' && tl.b.owner === p;
       const ok = swim ? (w || ownCity || (!aquatic && terrainOk(p, tl, false))) // swimmers take to any water
-        : startW ? terrainOk(p, tl, w) : (w ? isPortFor(x, y, p) : terrainOk(p, tl, false));
+        : startW ? terrainOk(p, tl, w) : (w ? isPortFor(x, y, p) : terrainOk(p, tl, false) || (fly && tl.t === 'mountain'));
       if (!ok) continue;
       const road = !startW && !w && roadish(cx, cy) && roadish(x, y);
       const nd = d + (road ? rail : 1);
@@ -566,7 +587,7 @@ function reach(u, prev) {
       if (!best.has(k)) out.push({ x, y });
       best.set(k, nd);
       if (prev) prev.set(k, [cx, cy]);
-      const stop = (w !== startW && !swim) || (!road && (tl.t === 'mountain' || (tl.res === 'forest' && !woods))) || zoc.has(k);
+      const stop = (w !== startW && !swim) || (!road && !fly && (tl.t === 'mountain' || (tl.res === 'forest' && !woods))) || zoc.has(k);
       if (!stop) q.push([nd, x, y]);
     }
   }
@@ -699,7 +720,7 @@ function ruinReward(u, x, y) {
   }
 }
 function aiPickPerk(u) {
-  if (u.type === 'defender' || u.type === 'giant') return rand() < 0.6 ? 'def' : 'hp';
+  if (u.type === 'defender' || UNITS[u.type].super) return rand() < 0.6 ? 'def' : 'hp';
   if (u.type === 'mindbender') return 'hp';
   const r = rand();
   return r < 0.5 ? 'atk' : r < 0.75 ? 'hp' : r < 0.9 ? 'def' : 'mv';
@@ -870,7 +891,7 @@ const linksOf = (c, p) => Object.keys(G.links || {}).filter(k => k.startsWith(p 
 function addPop(c, amount, p) {
   const b = c.b;
   b.pop += amount;
-  while (b.level < MAX_LEVEL && b.pop >= popNeeded(b)) {
+  while (b.pop >= popNeeded(b)) {
     b.pop -= popNeeded(b); b.level++;
     popFx(c.x, c.y, `Level ${b.level}!`, '#ffe27a');
     sfxAt('level', c.x, c.y); burst(c.x, c.y, 'level');
@@ -878,11 +899,12 @@ function addPop(c, amount, p) {
     else G.rewards.push({ x: c.x, y: c.y, level: b.level, owner: p });
   }
 }
-function rewardOptions(level) {
+function rewardOptions(level, p) {
+  const sup = UNITS[superFor(p !== undefined && G ? G.players[p].tribe : -1)];
   if (level === 2) return [['workshop', '🔨', 'Workshop', '+1 ⭐ every turn'], ['explorer', '🧭', 'Explorer', 'A scout sets off for unexplored lands and maps them'], ['militia', '⚔️', 'Militia', 'A free Warrior joins you in this city']];
   if (level === 3) return [['wall', '🧱', 'City wall', 'Fortified units in the city defend at ×4'], ['resources', '💰', 'Resources', '+5 ⭐ right now'], ['tower', '🗼', 'Watchtower', 'The city sees four tiles further']];
   if (level === 4) return [['popgrowth', '👥', 'Population growth', '+3 population'], ['border', '🗺️', 'Border growth', 'City borders grow by one ring'], ['barracks', '🎖️', 'Barracks', 'Units trained here start as veterans']];
-  return [['park', '🌳', 'Park', '+1 ⭐ every turn and 250 points'], ['giant', '🗿', 'Super unit', 'A Giant joins you in this city'], ['academy', '🎓', 'Academy', 'Every technology costs 1 ⭐ less']];
+  return [['park', '🌳', 'Park', '+1 ⭐ every turn and 250 points'], ['giant', sup.icon, sup.name, `Your tribe's super unit joins you in this city`], ['academy', '🎓', 'Academy', 'Every technology costs 1 ⭐ less']];
 }
 function aiPickReward(level) {
   const r = rand();
@@ -904,11 +926,11 @@ function applyReward(c, key, p) {
   else if (key === 'barracks') b.barracks = true;
   else if (key === 'academy') b.academy = (b.academy || 0) + 1;
   else if (key === 'giant' || key === 'militia') { // a free unit, or its value in stars if there is no room
-    const type = key === 'giant' ? 'giant' : 'warrior';
+    const type = key === 'giant' ? superFor(pl.tribe) : 'warrior';
     const spots = [{ x: c.x, y: c.y }, ...DIRS.map(([dx, dy]) => ({ x: c.x + dx, y: c.y + dy }))];
     const s = spots.find(s => inb(s.x, s.y) && T(s.x, s.y).t === 'land' && !unitAt(s.x, s.y));
     if (s) spawns.set(G.nextId, performance.now());
-    if (s) G.units.push({ id: G.nextId++, type, owner: p, x: s.x, y: s.y, hp: UNITS[type].hp, moved: true, attacked: true, done: true, kills: 0, vet: false, home: type === 'giant' ? { x: c.x, y: c.y } : null });
+    if (s) G.units.push({ id: G.nextId++, type, owner: p, x: s.x, y: s.y, hp: UNITS[type].hp, moved: true, attacked: true, done: true, kills: 0, vet: false, home: key === 'giant' ? { x: c.x, y: c.y } : null });
     else pl.stars += key === 'giant' ? 10 : 2;
   }
   updateVis();
@@ -1212,7 +1234,7 @@ function aiGoalField(p) {
   return dist;
 }
 function aiTargetScore(u, e, from) {
-  if (has(u, 'convert')) return e.type === 'giant' ? 14 : 4 + UNITS[e.type].cost;
+  if (has(u, 'convert')) return UNITS[e.type].super ? 14 : 4 + UNITS[e.type].cost;
   const saved = [u.x, u.y];
   u.x = from.x; u.y = from.y;
   const r = combatCalc(u, e, cheb(from, e));
@@ -1392,7 +1414,7 @@ function iconURL(key, paint) {
 const unitIcon = (type, tribe) => iconURL(`u-${type}-${tribe}`, () => {
   ellipse(0, 41, 30, 10, 'rgba(0,0,0,.16)');
   ctx.translate(0, 42);
-  const s = type === 'giant' ? 1.25 : type === 'knight' || type === 'rider' ? 1.6 : type === 'catapult' ? 2.1 : 1.9;
+  const s = UNITS[type].super ? 1.2 : type === 'knight' || type === 'rider' || type === 'horsearcher' ? 1.6 : type === 'catapult' || type === 'trebuchet' ? 1.9 : type === 'golem' || type === 'treant' || type === 'leviathan' ? 1.5 : 1.9;
   ctx.scale(s, s);
   paintUnit(type, tribe, 'land');
 });
@@ -1477,10 +1499,11 @@ function renderSheet() {
     if (st.skills.length) text += `<span class="skills">${st.skills.map(k => `<span title="${SKILL_INFO[k]}">${SKILL_INFO[k].split(':')[0]}</span>`).join('')}</span>`;
   } else if (b && b.kind === 'city') {
     const owner = G.players[b.owner];
-    title = `${b.capital ? CROWN_SVG : `<i class="dot" style="background:${owner.color}"></i>`}${esc(b.name)} <small>${b.capital ? 'Capital' : 'City'} · level ${b.level}${b.owner === me ? '' : ` · <a class="pname" data-player="${b.owner}" href="#">${esc(owner.name)}</a>`}</small>`;
+    title = `${b.capital ? CROWN_SVG : `<i class="dot" style="background:${owner.color}"></i>`}${esc(b.name)} <small>${b.capital ? 'Capital' : TIER_NAME[cityTier(b.level)] || 'City'} · level ${b.level}${b.owner === me ? '' : ` · <a class="pname" data-player="${b.owner}" href="#">${esc(owner.name)}</a>`}</small>`;
     if (b.owner === me) {
-      const need = b.level >= MAX_LEVEL ? 0 : popNeeded(b), c = { x, y, b };
-      const pips = need ? `<span class="pips" title="Population ${b.pop} of ${need}">${Array.from({ length: need }, (_, i) => `<i class="${i < b.pop ? 'on' : ''}"></i>`).join('')}</span>` : '';
+      const need = popNeeded(b), c = { x, y, b };
+      const pips = need > 10 ? `<span class="pbar" title="Population ${b.pop} of ${need}"><i style="width:${Math.round(b.pop / need * 100)}%"></i></span><span>${b.pop}/${need}</span>`
+        : `<span class="pips" title="Population ${b.pop} of ${need}">${Array.from({ length: need }, (_, i) => `<i class="${i < b.pop ? 'on' : ''}"></i>`).join('')}</span>`;
       text = `${pips}<span>+${cityIncome(c, me)} ${STAR_SVG} per turn</span><span>Units ${supported(c, me)}/${b.level + 1}</span><span title="Roads that join two of your cities give each a citizen">🛤️ ${linksOf(c, me)} road link${linksOf(c, me) === 1 ? '' : 's'}</span>${['wall:City walls', 'tower:Watchtower', 'barracks:Barracks', 'academy:Academy'].filter(e => b[e.split(':')[0]]).map(e => `<span>${e.split(':')[1]}</span>`).join('')}`;
     } else text = allied(b.owner, me) ? '<span>An allied city. 🤝</span>' : `<span>Stand a unit in the city for a turn, then capture it.</span>`;
   } else if (b && b.kind === 'village') { title = 'Village'; text = 'Move a unit here; next turn it can capture the village.'; }
@@ -1672,7 +1695,7 @@ function showReward() {
   if (!G.rewards.length) { showProposal(); return; }
   const r = G.rewards[0], c = { x: r.x, y: r.y, b: T(r.x, r.y).b };
   if (!c.b || c.b.kind !== 'city' || c.b.owner !== r.owner) { G.rewards.shift(); showReward(); return; }
-  showChoice(`${c.b.name} · Level ${r.level}`, 'Choose a reward for your city.', rewardOptions(r.level), key => {
+  showChoice(`${c.b.name} · Level ${r.level}`, 'Choose a reward for your city.', rewardOptions(r.level, r.owner), key => {
     G.rewards.shift();
     applyReward(c, key, r.owner);
   });
@@ -2854,15 +2877,38 @@ function paintPlaza(style) {
   ctx.strokeStyle = shade(c, -0.14); ctx.lineWidth = 0.5;
   for (let k = 1; k < 4; k++) { const t = k / 4; line(-22 + 22 * t, -11 * t, 22 * t, 11 - 11 * t); }
 }
-function paintCity(tribe, level, capital, wall) {
+function paintCity(tribe, level, capital, wall, tier = 0) {
   const col = TRIBES[tribe].color, pal = { roof: col, roof2: shade(col, -0.24) };
   if (level >= 2) paintPlaza(tribe);
   if (wall) cityWalls(tribe, false);
+  if (tier >= 2) for (const [tx, ty] of [[-21, -6], [21, -6]]) { // twin towers behind the town
+    isoBox(tx, ty, 3.4, 22 + tier * 3, '#e6dfcf', '#c4bba6', '#efe8d8', 0);
+    cone(tx, ty - 22 - tier * 3, 4.4, 7, tier >= 3 ? '#ffd34d' : col, tier >= 3 ? '#d9a521' : shade(col, -0.25));
+  }
+  if (tier >= 3) { // a wonder spire rising behind the hall
+    poly([[-3.4, -12], [0, -62 - tier * 4], [3.4, -12]], tier >= 4 ? '#bff4ff' : '#ffe58a');
+    poly([[0, -10.5], [0, -62 - tier * 4], [3.4, -12]], tier >= 4 ? '#7ad8f0' : '#e9b93a');
+    circle(0, -62 - tier * 4, 2.6, '#ffffff');
+  }
   const items = [];
   for (let i = 0; i < Math.min(6, level + 1); i++) items.push({ x: CITY_SLOTS[i][0], y: CITY_SLOTS[i][1], i, hall: capital && i === 0 });
   items.sort((a, b) => a.y - b.y || a.x - b.x);
   for (const it of items) building(tribe, it.x, it.y, it.hall ? 'hall' : 'house', pal, level, it.i);
+  if (tier >= 1) { // banners and a statue in the plaza
+    for (const [bx, by] of [[-18, 4], [18, 4], [0, 13]]) { ctx.strokeStyle = '#4a3a2e'; ctx.lineWidth = 0.9; line(bx, by, bx, by - 13); poly([[bx, by - 13], [bx + 5, by - 11.6], [bx, by - 10]], col); }
+    isoBox(-9, 12, 2.6, 2.4, '#d9d0bd', '#b8ad97', '#e8e1d0', 0);
+    poly([[-10.4, 9.6], [-9, 2.6], [-7.6, 9.6]], tier >= 3 ? '#ffd34d' : '#cfc6b2'); circle(-9, 2, 1.4, tier >= 3 ? '#ffd34d' : '#cfc6b2');
+  }
   if (wall) cityWalls(tribe, true);
+}
+function cityGlow(cx, cy, tier, col, now) { // a soft pulsing light around the greatest cities
+  const t = reduceMotion ? 0.5 : (Math.sin(now / 700) + 1) / 2, r = 34 + tier * 3;
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  const g = ctx.createRadialGradient(cx, cy - 66 - tier * 4, 0, cx, cy - 66 - tier * 4, 16);
+  g.addColorStop(0, `rgba(255,240,180,${0.5 + 0.3 * t})`); g.addColorStop(1, 'rgba(255,240,180,0)');
+  circle(cx, cy - 66 - tier * 4, 16, g);
+  ctx.strokeStyle = `rgba(255,226,122,${0.18 + 0.12 * t})`; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.ellipse(cx, cy + 2, r, r / 2, 0, 0, 6.283); ctx.stroke();
+  ctx.restore();
 }
 function paintVillage(style) {
   const pal = { roof: '#b5803f', roof2: '#8f6430' };
@@ -3269,7 +3315,25 @@ function paintUnit(type, tribe, medium) {
       for (let k = 0; k < 4; k++) circle(-4.5 + k * 3, -1.6, 0.9, ['#e8403a', '#ffd23f', '#2fd1c4', '#ffffff'][k]);
       paintPerson('shaman', tribe, col, skin, { noLegs: true, weapon: 'totem' });
       break;
-    case 'giant': ctx.save(); ctx.scale(1.55, 1.55); paintPerson('giant', tribe, col, skin, {}); ctx.restore(); break;
+    case 'giant': case 'jungletitan': ctx.save(); ctx.scale(1.55, 1.55); paintPerson('giant', tribe, col, skin, {}); ctx.restore(); break;
+    case 'stormlord': // a giant rider wreathed in lightning
+      ctx.save(); ctx.scale(1.3, 1.3); paintHorse('#eef0f6', col, true); ctx.translate(-1.2, -9.5); paintPerson('knight', tribe, col, skin, { noLegs: true, weapon: 'lance' }); ctx.restore();
+      ctx.strokeStyle = '#ffe27a'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(-14, -52); ctx.lineTo(-10, -45); ctx.lineTo(-13, -44); ctx.lineTo(-8, -36); ctx.stroke();
+      break;
+    case 'greatbear': ctx.save(); ctx.scale(1.2, 1.2); paintBear(col); ctx.restore(); break;
+    case 'suncolossus': // a golden statue with a sun halo
+      circle(0.9, -40, 13, 'rgba(255,214,80,.28)'); for (let k = 0; k < 12; k++) { const a = k * Math.PI / 6; ctx.strokeStyle = 'rgba(255,214,80,.6)'; ctx.lineWidth = 1.2; line(0.9 + Math.cos(a) * 11, -40 + Math.sin(a) * 11, 0.9 + Math.cos(a) * 15, -40 + Math.sin(a) * 15); }
+      ctx.save(); ctx.scale(1.55, 1.55); paintPerson('giant', tribe, '#e2b23a', '#f2cf6a', { weapon: 'spear' }); ctx.restore();
+      break;
+    case 'stonegiant': ctx.save(); ctx.scale(1.3, 1.3); paintGolem(col, { a: '#9a958c', b: '#7c776e', c: '#b4afa5', d: '#5e5a53', eye: '#ffe27a', moss: true }); ctx.restore(); break;
+    case 'mammoth': ctx.save(); ctx.scale(1.2, 1.2); paintMammoth(col); ctx.restore(); break;
+    case 'magmatitan': ctx.save(); ctx.scale(1.3, 1.3); paintGolem(col, { a: '#3b3438', b: '#2a2427', c: '#4d464b', d: '#1c181a', eye: '#ffb347', lava: true }); ctx.restore(); break;
+    case 'spiritdragon': ctx.save(); ctx.scale(1.3, 1.3); paintDragon(col); ctx.restore(); break;
+    case 'gianttoad': ctx.save(); ctx.scale(1.9, 1.9); frog(); poly([[-3, -10], [-1.5, -13], [0, -10.5], [1.5, -13], [3, -10]], col); ctx.restore(); break;
+    case 'crystalcolossus': ctx.save(); ctx.scale(1.3, 1.3); paintGolem(col, { a: '#a9a2d0', b: '#8a83b6', c: '#c9c3ea', d: '#6e6798', eye: '#9fe4f6', crystal: true }); ctx.restore(); break;
+    case 'seatitan': ctx.save(); ctx.scale(1.5, 1.5); paintPerson('giant', tribe, '#2f8796', '#8fd0c8', { weapon: 'trident' }); ctx.restore(); break;
+    case 'warengine': ctx.save(); ctx.scale(1.3, 1.3); paintWarEngine(col, tribe); ctx.restore(); break;
+    case 'eldertreant': ctx.save(); ctx.scale(1.35, 1.35); paintTreant(col); ctx.restore(); break;
     case 'mindbender': // long robe instead of legs
       poly([[-6.4, 0.4], [6.4, 0.4], [5, -8], [-5, -8]], shade(col, -0.35));
       poly([[0.9, 0.4], [6.4, 0.4], [5, -8], [0.9, -8]], shade(col, -0.5));
@@ -3335,15 +3399,70 @@ function paintLeviathan(col) { // a sea serpent rising in coils
   for (const [fx, fy] of [[-15, -4], [-5, -10], [6, -12]]) poly([[fx, fy], [fx + 2, fy - 4.5], [fx + 4, fy]], col);
   for (const x of [-18, -8, 2, 11]) ellipse(x, 2.6, 3.4, 1, 'rgba(255,255,255,.6)');
 }
-function paintGolem(col) { // a towering figure of riveted iron
-  const a = '#8b8f96', b = '#6d7178', c = '#a9adb4';
+function paintGolem(col, pal) { // a towering figure of riveted iron (or stone, magma or crystal)
+  const { a, b, c, d, eye } = pal || { a: '#8b8f96', b: '#6d7178', c: '#a9adb4', d: '#55595f', eye: col };
   isoBox(-4.5, 0, 3.4, 9, a, b, c, 0); isoBox(4.5, 0, 3.4, 9, a, b, c, 0);
   isoBox(0, -9, 9, 13, a, b, c, 0);
-  isoBox(-11, -12, 3, 11, b, '#55595f', a, 0); isoBox(11, -12, 3, 11, b, '#55595f', a, 0);
+  isoBox(-11, -12, 3, 11, b, d, a, 0); isoBox(11, -12, 3, 11, b, d, a, 0);
   isoBox(0, -22, 5, 6, a, b, c, 0);
-  for (const [rx, ry] of [[-5, -14], [5, -14], [-5, -18], [5, -18]]) circle(rx, ry, 0.7, '#4a4e55');
-  circle(-1.8, -27, 1.1, col); circle(2, -27, 1.1, col);
+  if (!pal) for (const [rx, ry] of [[-5, -14], [5, -14], [-5, -18], [5, -18]]) circle(rx, ry, 0.7, '#4a4e55');
+  if (pal && pal.moss) for (const [mx, my, r] of [[-7, -21, 2.4], [5, -22, 2], [-12, -22, 1.6], [2, -27, 1.6]]) ellipse(mx, my, r * 1.4, r * 0.8, '#5f9a4a');
+  if (pal && pal.lava) { ctx.strokeStyle = '#ff7a1f'; ctx.lineWidth = 1.2; line(-6, -18, -2, -12); line(-2, -12, -4, -6); line(5, -19, 3, -13); line(-10, -16, -11, -9); line(11, -18, 12, -10); }
+  if (pal && pal.crystal) for (const [qx, qy] of [[-11, -23], [11, -23], [0, -28]]) treeCrystal(qx, qy, 0.38, ['#bff0ff', '#7ad8f0', '#4aa8d0'], '#4a4468', qx + 9);
+  circle(-1.8, -27, 1.1, eye); circle(2, -27, 1.1, eye);
   poly([[-3, -16], [3, -16], [2, -12], [-2, -12]], col);
+}
+function paintBear(col) { // a great bear with a tribal collar
+  const c = '#6b4a2b', c2 = '#523820', c3 = '#7f5a36';
+  for (const x of [-12, 6]) poly([[x - 2.6, 0], [x + 2.6, 0], [x + 2.2, -12], [x - 2.2, -12]], c2);
+  poly([[-17, -12], [-14, -24], [4, -27], [14, -22], [15, -12], [-15, -8]], c);
+  poly([[-17, -12], [-14, -24], [-4, -26], [-9, -12]], c3);
+  for (const x of [-8, 11]) { poly([[x - 2.8, 0], [x + 2.8, 0], [x + 2.4, -13], [x - 2.4, -13]], c); ellipse(x, 0, 3, 1.2, '#2a1a10'); }
+  poly([[12, -24], [22, -23], [25, -17], [20, -14], [13, -16]], c);
+  poly([[22, -19], [26, -17], [23, -15.6]], '#2a1a10');
+  circle(15, -25, 2.2, c); circle(19.5, -25.6, 2.2, c); circle(19.6, -20.6, 0.8, '#111');
+  ctx.strokeStyle = col; ctx.lineWidth = 2.4; line(10.5, -24, 12.5, -14);
+  circle(12, -18, 1.2, '#ffd34d');
+}
+function paintMammoth(col) { // a shaggy ice mammoth with long tusks
+  const c = '#7a5638', c2 = '#5e4229', fur = '#8f6a48';
+  for (const x of [-12, 4]) poly([[x - 3, 0], [x + 3, 0], [x + 2.6, -14], [x - 2.6, -14]], c2);
+  poly([[-19, -14], [-15, -30], [4, -33], [15, -26], [15, -12], [-17, -10]], c);
+  for (let k = 0; k < 9; k++) { const x = -16 + k * 3.6; poly([[x, -12], [x + 2, -12], [x + 1, -6 - (k % 2) * 2]], fur); }
+  poly([[-19, -14], [-15, -30], [-5, -32], [-10, -14]], fur);
+  for (const x of [-8, 9]) { poly([[x - 3, 0], [x + 3, 0], [x + 2.6, -14], [x - 2.6, -14]], c); ellipse(x, 0, 3.2, 1.2, '#2a1a10'); }
+  poly([[10, -30], [21, -27], [22, -18], [15, -14], [11, -18]], c);
+  ctx.strokeStyle = c; ctx.lineWidth = 3.4; ctx.beginPath(); ctx.moveTo(20, -20); ctx.quadraticCurveTo(25, -10, 21, -3); ctx.stroke();
+  ctx.strokeStyle = '#f5efe2'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(17, -17); ctx.quadraticCurveTo(28, -14, 27, -24); ctx.stroke();
+  circle(17, -25, 0.9, '#111');
+  ellipse(-4, -33, 9, 2.6, '#ffffff'); ellipse(6, -30, 5, 1.8, '#eef4fa');
+  poly([[-6, -30], [6, -31], [6, -27], [-6, -26]], col);
+}
+function paintDragon(col) { // a long spirit dragon, curling through the air
+  const body = '#e85a7a', belly = '#ffd6a0', dark = '#b8385a';
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = dark; ctx.lineWidth = 7; ctx.beginPath(); ctx.moveTo(-22, -10); ctx.bezierCurveTo(-14, -34, 2, 2, 10, -24); ctx.stroke();
+  ctx.strokeStyle = body; ctx.lineWidth = 5.4; ctx.stroke();
+  ctx.strokeStyle = belly; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(-21, -8); ctx.bezierCurveTo(-13, -31, 2, 5, 10, -21); ctx.stroke();
+  ctx.lineCap = 'butt';
+  for (let k = 0; k < 6; k++) { const t = k / 5, x = -20 + t * 28, y = -16 - Math.sin(t * Math.PI * 1.4) * 8; poly([[x - 1.6, y - 2], [x, y - 6], [x + 1.6, y - 2]], col); }
+  poly([[8, -28], [18, -31], [21, -25], [12, -21]], body); poly([[12, -21], [21, -25], [19, -21]], dark);
+  ctx.strokeStyle = '#ffd34d'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(19, -25); ctx.quadraticCurveTo(26, -27, 27, -20); ctx.stroke(); ctx.beginPath(); ctx.moveTo(18, -23); ctx.quadraticCurveTo(24, -20, 22, -15); ctx.stroke();
+  poly([[11, -30], [9, -36], [13, -31]], '#ffd34d'); poly([[14, -31], [14, -37], [16, -31]], '#ffd34d');
+  circle(16, -27.5, 1, '#ffffff'); circle(16.2, -27.5, 0.5, '#111');
+  for (const [lx, ly] of [[-14, -16], [3, -12]]) { ctx.strokeStyle = dark; ctx.lineWidth = 1.6; line(lx, ly, lx - 1, ly + 7); line(lx - 1, ly + 7, lx + 2, ly + 8); }
+  ellipse(-4, 2, 12, 3, 'rgba(255,190,220,.25)');
+}
+function paintWarEngine(col, tribe) { // a steam-driven siege tank
+  for (const wx of [-12, -4, 4, 12]) { circle(wx, -2, 3.4, '#3b3438'); circle(wx, -2, 1.6, '#77797f'); }
+  isoBox(0, -4, 15, 9, '#8a6a3f', '#6b5030', '#a5824f', 0);
+  for (let k = -12; k <= 12; k += 4) circle(k, -9, 0.6, '#3b3438');
+  isoBox(-2, -13, 8, 6, '#9aa2ad', '#78808b', '#b8c0ca', 0);
+  ctx.strokeStyle = '#4a4e55'; ctx.lineWidth = 3; line(4, -17, 19, -22);
+  isoBox(-9, -16, 2, 10, '#5a5d63', '#45474c', '#6d7075', 0);
+  circle(-9, -28, 3, 'rgba(200,200,205,.6)'); circle(-7, -32, 2.2, 'rgba(200,200,205,.45)');
+  poly([[-2, -19], [6, -21], [6, -16], [-2, -14]], col);
+  emblem(tribe, 2, -17.5, 0.6, emblemInk(col));
 }
 function paintTreant(col) { // a walking tree that tends its friends
   const bark = '#6b4a2b', bark2 = '#523820';
@@ -3754,7 +3873,7 @@ function makeDemo() {
       const x = rndInt(d.n), y = rndInt(d.n), tl = T(x, y);
       if (unitAt(x, y) || tl.t === 'mountain' || tl.t === 'ocean' || (tl.t === 'water' && Math.random() < 0.7)) continue;
       const near = caps.reduce((a, c) => (cheb(c, { x, y }) < cheb(a, { x, y }) ? c : a));
-      const type = Math.random() < 0.04 ? 'giant' : types[rndInt(types.length)];
+      const type = Math.random() < 0.05 ? superFor(d.players[near.b.owner].tribe) : types[rndInt(types.length)];
       d.units.push({ id: d.nextId++, type, owner: near.b.owner, x, y, hp: Math.max(3, UNITS[type].hp - rndInt(6)), moved: false, attacked: false, kills: 0, vet: Math.random() < 0.15 });
     }
     d.vis[0] = d.vis[0].map(r => r.map(() => 2));
@@ -3815,10 +3934,11 @@ function drawBuildingAt(tl, x, y, cx, cy, now, dim) {
   if (b.kind === 'village') { blit(objSprite('village', `village|${tl.c}`, () => paintVillage(tl.c), dim), cx, cy); return; }
   if (b.kind === 'ruin') { blit(objSprite('ruin', 'ruin', paintRuin, dim), cx, cy); if (!dim) ruinGlow(cx, cy, now); return; }
   if (b.kind === 'start') { pole(cx, cy + 2, cy - 30); waveFlag(cx, cy - 30, '#ffcf3f', now, 0); return; } // a starting spot in the map editor
-  const pl = G.players[b.owner], tribe = pl.tribe, lv = Math.min(b.level, 8);
-  blit(objSprite('city', `city|${tribe}|${lv}|${b.capital ? 1 : 0}|${b.wall ? 1 : 0}`, () => paintCity(tribe, lv, b.capital, b.wall), dim), cx, cy);
+  const pl = G.players[b.owner], tribe = pl.tribe, lv = Math.min(b.level, 8), tier = cityTier(b.level);
+  blit(objSprite('city', `city|${tribe}|${lv}|${tier}|${b.capital ? 1 : 0}|${b.wall ? 1 : 0}`, () => paintCity(tribe, lv, b.capital, b.wall, tier), dim), cx, cy);
+  if (tier >= 3 && !dim) cityGlow(cx, cy, tier, pl.color, now);
   if (b.capital && !dim) { const [fx, fy] = hallFlag(tribe, lv); waveFlag(cx + fx, cy + fy, pl.color, now, tribe); }
-  labels.push({ x: cx, y: cy + 15, text: b.name, capital: b.capital, level: b.level, color: pl.color, pop: b.pop, need: b.level >= MAX_LEVEL ? 0 : popNeeded(b), ally: b.owner !== G.view && allied(b.owner, G.view) });
+  labels.push({ x: cx, y: cy + 15, text: b.name, capital: b.capital, level: b.level, color: pl.color, pop: b.pop, need: popNeeded(b), ally: b.owner !== G.view && allied(b.owner, G.view) });
 }
 const unitMedium = u => (isWater(T(u.x, u.y)) && !swims(u) ? ['boat', 'ship', 'battleship'][u.boat || 0] : 'land');
 const unitSprite = (type, tribe, medium) => getSprite(`unit|${type}|${tribe}|${medium}`, BOX.unit, () => paintUnit(type, tribe, medium));
@@ -3873,7 +3993,7 @@ function drawUnit(u, now, demoMode) {
   const tw = ctx.measureText(txt).width + 8;
   pill(cx + 14 - tw / 2, py - 6, tw, 12, 'rgba(11,18,32,.88)');
   ctx.fillStyle = f > 0.5 ? '#86ffa0' : f > 0.25 ? '#ffd166' : '#ff6a5a'; ctx.fillText(txt, cx + 14, py + 0.5);
-  const top = cy + bob + hop - (u.type === 'giant' ? 60 : u.type === 'rider' || u.type === 'knight' ? 46 : u.type === 'catapult' ? 32 : 38) - (water ? 6 : 0);
+  const top = cy + bob + hop - (UNITS[u.type].super ? 62 : u.type === 'rider' || u.type === 'knight' ? 46 : u.type === 'catapult' ? 32 : 38) - (water ? 6 : 0);
   if (u.vet) { ctx.font = '13px system-ui,sans-serif'; ctx.fillStyle = '#ffd54a'; ctx.strokeStyle = '#5a3d00'; ctx.lineWidth = 2.5; ctx.strokeText('★', cx, top); ctx.fillText('★', cx, top); }
   if (!demoMode && u.owner === G.view && G.cur === G.view && !u.attacked && !busy) circle(cx - 14, py, 3.2, '#6dff8a', '#0b1220', 1.2);
 }
@@ -4051,11 +4171,18 @@ function drawWorld(now, demoMode) {
     const crown = l.capital ? 12 : 0, tw = ctx.measureText(l.text).width, w = tw + 22 + crown, x0 = l.x - w / 2;
     pill(x0, l.y - 6.5, w, 13, 'rgba(11,18,32,.84)');
     if (l.capital) poly([[x0 + 4, l.y + 3], [x0 + 4, l.y - 2.5], [x0 + 6.6, l.y], [x0 + 9, l.y - 4], [x0 + 11.4, l.y], [x0 + 14, l.y - 2.5], [x0 + 14, l.y + 3]], '#ffcf3f', '#7a5200', 0.8);
-    circle(x0 + w - 7, l.y, 5.2, l.color, '#0b1220', 1);
+    const tier = cityTier(l.level), br = l.level >= 10 ? 6.4 : 5.2;
+    if (tier) circle(x0 + w - 7, l.y, br + 1.8, TIER_RING[tier]);
+    circle(x0 + w - 7, l.y, br, l.color, '#0b1220', 1);
     ctx.fillStyle = '#fff'; ctx.fillText(l.text, l.x - 5 + crown / 2, l.y + 0.5);
     if (l.ally) { ctx.font = '10px system-ui, sans-serif'; ctx.fillText('🤝', x0 - 8, l.y + 0.5); }
-    ctx.font = '800 8px Nunito, system-ui, sans-serif'; ctx.fillStyle = '#0b1220'; ctx.fillText(String(l.level), x0 + w - 7, l.y + 0.5);
-    if (l.need) {
+    ctx.font = `800 ${l.level >= 100 ? 6 : l.level >= 10 ? 7.2 : 8}px Nunito, system-ui, sans-serif`; ctx.fillStyle = '#0b1220'; ctx.fillText(String(l.level), x0 + w - 7, l.y + 0.5);
+    if (l.need > 9) { // a long climb: a bar instead of pips
+      const bw = 44, px = l.x - bw / 2, py = l.y + 9;
+      pill(px - 2.5, py - 2, bw + 5, 7, 'rgba(11,18,32,.84)');
+      ctx.fillStyle = 'rgba(255,255,255,.25)'; ctx.fillRect(px, py, bw, 3);
+      ctx.fillStyle = '#8fe9ff'; ctx.fillRect(px, py, bw * Math.min(1, l.pop / l.need), 3);
+    } else if (l.need) {
       const pw = 5, gap = 1.5, tot = l.need * pw + (l.need - 1) * gap, px = l.x - tot / 2, py = l.y + 9;
       pill(px - 2.5, py - 2, tot + 5, 7, 'rgba(11,18,32,.84)');
       for (let i = 0; i < l.need; i++) { ctx.fillStyle = i < l.pop ? '#8fe9ff' : 'rgba(255,255,255,.25)'; ctx.fillRect(px + i * (pw + gap), py, pw, 3); }
@@ -4948,7 +5075,7 @@ function renderAdmin() {
     <section><h3>Unit prices</h3><div class="adm-prices">${Object.keys(UNITS).filter(k => UNITS[k].train !== false).map(k => `<label><img src="${unitIcon(k, G.players[G.view].tribe)}" alt=""><span>${UNITS[k].name}</span><input type="number" min="0" max="999" data-price="${k}" value="${unitCost(k)}"></label>`).join('')}</div>
       <div class="adm-row"><button class="btn dark" data-adm="prices0">All free</button><button class="btn dark" data-adm="pricesreset">Normal prices</button></div></section>
     <section><h3>Units and cities</h3><div class="adm-row"><button class="btn blue" data-adm="refresh">Refresh my units</button><button class="btn blue" data-adm="heal">Heal my units</button>
-      <button class="btn blue" data-adm="citylevel">Selected city +1 level</button><button class="btn blue" data-adm="allcities">All my cities +1 level</button></div></section>
+      <button class="btn blue" data-adm="citylevel">Selected city +1 level</button><button class="btn blue" data-adm="city10">Selected city +10 levels</button><button class="btn blue" data-adm="allcities">All my cities +1 level</button></div></section>
     <section><h3>Game</h3><div class="adm-row"><button class="btn green" data-adm="win">Win now</button><button class="btn dark" data-adm="lock">Lock admin</button><button class="btn dark" data-adm="close">Close</button></div></section>`;
 }
 function adminDo(key) {
@@ -4972,9 +5099,10 @@ function adminDo(key) {
     case 'citylevel': {
       const t = sel && sel.kind === 'tile' ? T(sel.x, sel.y) : null;
       if (!t || !t.b || t.b.kind !== 'city') { toast('Select one of the cities on the map first.'); return; }
-      t.b.level = Math.min(MAX_LEVEL, t.b.level + 1); t.b.pop = 0; break;
+      t.b.level++; t.b.pop = 0; break;
     }
-    case 'allcities': for (const c of cityTiles(me)) { c.b.level = Math.min(MAX_LEVEL, c.b.level + 1); c.b.pop = 0; } break;
+    case 'allcities': for (const c of cityTiles(me)) { c.b.level++; c.b.pop = 0; } break;
+    case 'city10': { const t = sel && sel.kind === 'tile' ? T(sel.x, sel.y) : null; if (!t || !t.b || t.b.kind !== 'city') { toast('Select one of the cities on the map first.'); return; } t.b.level += 10; t.b.pop = 0; break; }
     case 'win': $('admin').hidden = true; endGame(me, 'domination'); return;
   }
   sfx('click'); refreshSel(); ui(); renderAdmin();
