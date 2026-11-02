@@ -1407,7 +1407,7 @@ function iconURL(key, paint) {
   const saved = ctx;
   ctx = c.getContext('2d');
   try { ctx.translate(64, 64); paint(); } finally { ctx = saved; }
-  const url = c.toDataURL();
+  const url = styleArt(c, 1.6).toDataURL();
   iconCache.set(key, url);
   return url;
 }
@@ -1809,19 +1809,20 @@ const EMBLEMS = ['chevron', 'flame', 'leaf', 'sun', 'peak', 'flake', 'ember', 'p
 const emblemInk = col => (luma(col) > 0.82 ? '#4a4f6a' : 'rgba(255,255,255,.92)'); // dark ink on very pale colours
 /* looks: each theme restyles the menus (style.css, by body[data-theme]) and how the map is painted and shaded */
 const THEMES = {
-  standard: { name: 'Standard', blurb: 'Bright, rounded and friendly. The classic look.', fx: 0, pixel: 1,
-    bg: ['#0b2746', '#061629'], vig: 'rgba(0,8,22,.45)', fog: '#c3cfdf', shore: '16,52,88', puff: ['#b8c7da', '#eef3f9', '255,255,255', '140,165,200'],
+  standard: { name: 'Standard', blurb: 'Polyweb\'s own look: faceted panels, hexagon buttons and paper-cut art.', fx: 0, pixel: 1,
+    bg: ['#0d3247', '#04131d'], vig: 'rgba(0,10,20,.45)', fog: '#c3cfdf', shore: '16,52,88', puff: ['#b8c7da', '#eef3f9', '255,255,255', '140,165,200'],
     depth: ['#6ad9e3', '#5ccde0', '#48b2e2', '#3d96d7', '#3583ca', '#2e71b8'] },
-  scifi: { name: 'Sci-fi', blurb: 'Neon glass panels, a glowing grid over the land and seas of light under a starfield.', fx: 1, pixel: 1,
+  scifi: { name: 'Sci-fi', blurb: 'Neon glass panels, metal-plated land with circuit lines, force-field cities and seas of light under the stars.', fx: 1, pixel: 1,
     bg: ['#070b24', '#010210'], vig: 'rgba(0,0,12,.55)', fog: '#262e62', shore: '10,20,70', puff: ['#1a2152', '#323f86', '130,225,255', '60,20,120'],
     depth: ['#5ff6ff', '#3fdcf2', '#26a8dc', '#2a6fc4', '#3a45a8', '#241e6a'], grid: 'rgba(110,245,255,.30)', stars: true },
-  fantasy: { name: 'Fantasy', blurb: 'Parchment, carved wood and gold. Painted seas under a warm golden light.', fx: 2, pixel: 1,
+  fantasy: { name: 'Fantasy', blurb: 'Carved wood and gold, storybook ink outlines, painted seas and warm golden light.', fx: 2, pixel: 1,
     bg: ['#3a2814', '#140b04'], vig: 'rgba(28,12,0,.6)', fog: '#e6d8b6', shore: '30,52,40', puff: ['#bba57a', '#ece0c0', '255,246,222', '140,105,60'],
     depth: ['#9fe0c0', '#7fcdb0', '#5cb09c', '#3f9088', '#2f7273', '#25585e'] },
-  nostalgic: { name: 'Nostalgic', blurb: 'An old console: chunky pixels, 8-bit lettering and a flickering TV.', fx: 3, pixel: 2,
+  nostalgic: { name: 'Nostalgic', blurb: 'An old console: chunky pixels, a small 8-bit palette, black outlines and TV scanlines.', fx: 3, pixel: 2,
     bg: ['#000000', '#000000'], vig: 'rgba(0,0,0,.5)', fog: '#bcbcbc', shore: '0,0,80', puff: ['#9c9cb4', '#fcfcfc', '255,255,255', '110,110,170'],
     depth: ['#7ce4ff', '#5cc4fc', '#3c9cf8', '#2878e8', '#1858d0', '#0838a8'] },
 };
+let turnOn = (() => { try { return localStorage.getItem('polyweb-turn') === '1'; } catch (e) { return false; } })(), needleYaw = null;
 let theme = (() => { try { const t = localStorage.getItem('polyweb-theme'); return THEMES[t] ? t : 'standard'; } catch (e) { return 'standard'; } })();
 const TH_ = () => THEMES[theme];
 let DEPTH_COLS = TH_().depth;
@@ -1880,7 +1881,7 @@ function setTheme(id) {
   theme = id; DEPTH_COLS = THEMES[id].depth;
   document.body.dataset.theme = id;
   try { localStorage.setItem('polyweb-theme', id); } catch (e) { /* ignore */ }
-  groundCaches.clear(); cloudCaches.clear();
+  groundCaches.clear(); cloudCaches.clear(); spriteCache.clear(); spriteLatest.clear(); iconCache.clear();
   resize();
 }
 // The sky behind the map: a slow twinkling starfield for sci-fi, nothing extra otherwise.
@@ -1916,12 +1917,75 @@ function drawThemeOverlay() {
   }
   ctx.restore();
 }
-const wxOf = (x, y) => (x - y) * TW / 2;
-const wyOf = (x, y) => (x + y) * TH / 2;
+/* the camera's projection: grid steps along x and y move by the basis vectors E1 and E2 on screen.
+   Turning the camera (yaw) spins them around the map's centre and tilting it (pitch) squashes them;
+   everything standing up (trees, cities, units) stays an upright picture, so the world still looks 2D. */
+let camYaw = 0, camPitch = 0.5, ROT = false, E1x = 32, E1y = 16, E2x = -32, E2y = 16, projKey = '0', lastTurn = -1e9;
+let yawGoal = null; // { yaw, pitch } while the camera glides to a new angle
+const PITCH_MIN = 0.36, PITCH_MAX = 0.66;
+function setBasis(yaw, pitch) {
+  camYaw = yaw; camPitch = pitch;
+  ROT = Math.abs(yaw) > 1e-5 || Math.abs(pitch - 0.5) > 1e-5;
+  if (!ROT) { camYaw = 0; camPitch = 0.5; E1x = 32; E1y = 16; E2x = -32; E2y = 16; projKey = '0'; return; }
+  const a = Math.PI / 4 + yaw, K = 32 * Math.SQRT2, c = Math.cos(a), sn = Math.sin(a);
+  E1x = K * c; E1y = K * sn * pitch; E2x = -K * sn; E2y = K * c * pitch;
+  projKey = yaw.toFixed(4) + '|' + pitch.toFixed(3);
+}
+const PIV = () => (G ? G.n : 0) / 2; // the map turns around its middle
+// a point on the grid (continuous; tile x,y covers x..x+1, y..y+1) to world coordinates
+function projG(gx, gy) {
+  if (!ROT) return [(gx - gy) * 32, (gx + gy) * 16];
+  const p = PIV();
+  return [(gx - p) * E1x + (gy - p) * E2x, (gx - p) * E1y + (gy - p) * E2y + 32 * p];
+}
+function unproj(wx, wy) {
+  if (!ROT) { const a = wx / 32, b = wy / 16; return { gx: (a + b) / 2, gy: (b - a) / 2 }; }
+  const p = PIV(), dx = wx, dy = wy - 32 * p, det = E1x * E2y - E2x * E1y;
+  return { gx: (dx * E2y - E2x * dy) / det + p, gy: (E1x * dy - E1y * dx) / det + p };
+}
+// wxOf, wyOf + TH / 2 is the middle of a tile's top face
+function wxOf(x, y) { if (!ROT) return (x - y) * 32; const p = PIV(); return (x + 0.5 - p) * E1x + (y + 0.5 - p) * E2x; }
+function wyOf(x, y) { if (!ROT) return (x + y) * 16; const p = PIV(); return (x + 0.5 - p) * E1y + (y + 0.5 - p) * E2y + 32 * p - 16; }
+// An offset drawn for the standard view (dx, dy from a tile's middle) carried into the current view.
+function isoP(cx, cy, dx, dy) {
+  if (!ROT) return [cx + dx, cy + dy];
+  const u = dx / 64 + dy / 32, v = dy / 32 - dx / 64;
+  return [cx + E1x * u + E2x * v, cy + E1y * u + E2y * v];
+}
+const facesViewer = (dx, dy) => dx * E1y + dy * E2y > 0; // is the edge towards this neighbour on the near side?
+// Tiles in the order they must be painted, back to front, for the current view.
+const orderCache = new Map();
+function tileOrder(lo, hi) {
+  const k = lo + '|' + hi + '|' + (ROT && turning(performance.now()) ? 'm' + Math.round(camYaw * 24) + '|' + Math.round(camPitch * 40) : projKey); // mid-turn, nearby angles share an order
+  let o = orderCache.get(k);
+  if (o) return o;
+  const cells = [];
+  for (let y = lo; y <= hi; y++) for (let x = lo; x <= hi; x++) cells.push([x, y, (x + 0.5) * E1y + (y + 0.5) * E2y]);
+  cells.sort((a, b) => a[2] - b[2] || a[0] - b[0]);
+  o = new Int16Array(cells.length * 2);
+  cells.forEach((c, i) => { o[2 * i] = c[0]; o[2 * i + 1] = c[1]; });
+  if (orderCache.size > 12) orderCache.clear();
+  orderCache.set(k, o);
+  return o;
+}
+function mapBounds(lo, hi) { // the world-space box around grid corners lo..hi
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (const [gx, gy] of [[lo, lo], [hi, lo], [lo, hi], [hi, hi]]) { const [px, py] = projG(gx, gy); x0 = Math.min(x0, px); x1 = Math.max(x1, px); y0 = Math.min(y0, py); y1 = Math.max(y1, py); }
+  return { x0, x1, y0, y1 };
+}
+// Turn and tilt the camera, keeping the spot in the middle of the screen in the middle.
+function turnCamera(yaw, pitch) {
+  pitch = Math.max(PITCH_MIN, Math.min(PITCH_MAX, pitch));
+  if (yaw === camYaw && pitch === camPitch) return;
+  const f = G ? unproj(cam.x, cam.y) : null, cg = G && camGoal ? unproj(camGoal.x, camGoal.y) : null;
+  setBasis(yaw, pitch); lastTurn = performance.now();
+  if (f) [cam.x, cam.y] = projG(f.gx, f.gy);
+  if (cg) [camGoal.x, camGoal.y] = projG(cg.gx, cg.gy);
+}
+const turning = now => now - lastTurn < 320;
 function pick(mx, my) {
-  const wx = (mx - W / 2) / cam.z + cam.x, wy = (my - H / 2) / cam.z + cam.y;
-  const a = wx / (TW / 2), b = (wy - TH / 2) / (TH / 2);
-  return { x: Math.round((a + b) / 2), y: Math.round((b - a) / 2) };
+  const g = unproj((mx - W / 2) / cam.z + cam.x, (my - H / 2) / cam.z + cam.y);
+  return { x: Math.floor(g.gx), y: Math.floor(g.gy) };
 }
 
 /* sprite cache: objects are painted once into small canvases and stamped onto the map */
@@ -1963,8 +2027,10 @@ function getSprite(key, box, paint, opts) {
 }
 function buildSprite(box, paint, scale, opts) {
   const [bx, by, bw, bh] = box, pw = Math.ceil(bw * scale), ph = Math.ceil(bh * scale);
-  const art = makeCanvas(pw, ph);
-  withCtx(art, () => { ctx.setTransform(scale, 0, 0, scale, -bx * scale, -by * scale); paint(); });
+  let art = makeCanvas(pw, ph);
+  const keep = [camYaw, camPitch, projKey === '0' ? null : 1];
+  if (ROT) setBasis(0, 0.5); // sprites are pictures drawn for the standard view, whichever way the camera faces
+  try { withCtx(art, () => { ctx.setTransform(scale, 0, 0, scale, -bx * scale, -by * scale); paint(); }); } finally { if (keep[2]) setBasis(keep[0], keep[1]); }
   if (opts.ao) withCtx(art, () => { // darken towards the ground
     ctx.setTransform(scale, 0, 0, scale, -bx * scale, -by * scale);
     ctx.globalCompositeOperation = 'source-atop';
@@ -1972,6 +2038,7 @@ function buildSprite(box, paint, scale, opts) {
     g.addColorStop(0, 'rgba(20,30,40,0)'); g.addColorStop(1, 'rgba(20,30,40,.3)');
     ctx.fillStyle = g; ctx.fillRect(bx, by, bw, bh);
   });
+  if (!opts.plain) art = styleArt(art, scale);
   if (!opts.shadow) return { c: art, x: bx, y: by, w: bw, h: bh };
   // cast shadow: the silhouette flattened onto the ground away from the light, blurred by painting it small
   const q = 0.25, sw = Math.ceil(pw * q), sh = Math.ceil(ph * q), low = makeCanvas(sw, sh);
@@ -1990,6 +2057,55 @@ function buildSprite(box, paint, scale, opts) {
     ctx.globalAlpha = 1; ctx.drawImage(art, 0, 0);
   });
   return { c: out, x: bx, y: by, w: bw, h: bh };
+}
+/* each style gives every picture its own finish: a paper-sticker edge (standard), a neon rim on cool metal (sci-fi),
+   a storybook ink line in warm colours (fantasy), or a hard black outline in a small 8-bit palette (nostalgic) */
+const ART = {
+  standard: { edge: 'rgba(255,255,255,.92)', edgeW: 0.75 },
+  scifi: { tint: 'cool', rim: '#8ff6ff', glow: 'rgba(54,240,255,.6)' },
+  fantasy: { tint: 'warm', edge: 'rgba(52,28,8,.9)', edgeW: 0.8 },
+  nostalgic: { tint: 'nes', edge: '#000', edgeW: 1, hard: true },
+};
+function styleArt(c, scale) {
+  const st = ART[theme];
+  if (!st) return c;
+  const w = c.width, h = c.height, g = c.getContext('2d');
+  if (st.tint) { // recolour pixel by pixel
+    const im = g.getImageData(0, 0, w, h), d = im.data;
+    for (let i = 0; i < d.length; i += 4) {
+      if (!d[i + 3]) continue;
+      let r = d[i] / 255, gg = d[i + 1] / 255, b = d[i + 2] / 255;
+      const l = 0.299 * r + 0.587 * gg + 0.114 * b;
+      if (st.tint === 'cool') { // brushed metal with a blue cast, colours kept in the brightest parts
+        const m = 0.42 - 0.22 * l;
+        r = r + (l * 0.72 + 0.02 - r) * m; gg = gg + (l * 0.9 + 0.05 - gg) * m; b = b + (l * 1.1 + 0.12 - b) * m;
+        r = (r - 0.5) * 1.12 + 0.5; gg = (gg - 0.5) * 1.12 + 0.5; b = (b - 0.5) * 1.12 + 0.5;
+      } else if (st.tint === 'warm') { // richer, sunlit colours
+        r = l + (r - l) * 1.22; gg = l + (gg - l) * 1.22; b = l + (b - l) * 1.22;
+        r = r * 1.07 + 0.015; gg = gg * 1.0 + 0.005; b = b * 0.84;
+      } else { // a small palette: four levels a channel, a little punchier
+        r = l + (r - l) * 1.3; gg = l + (gg - l) * 1.3; b = l + (b - l) * 1.3;
+        r = Math.round(Math.max(0, Math.min(1, r)) * 3) / 3; gg = Math.round(Math.max(0, Math.min(1, gg)) * 3) / 3; b = Math.round(Math.max(0, Math.min(1, b)) * 3) / 3;
+        d[i + 3] = d[i + 3] > 110 ? 255 : 0;
+      }
+      d[i] = Math.max(0, Math.min(255, r * 255)); d[i + 1] = Math.max(0, Math.min(255, gg * 255)); d[i + 2] = Math.max(0, Math.min(255, b * 255));
+    }
+    g.putImageData(im, 0, 0);
+  }
+  const silhouette = (col, src) => { const sc = makeCanvas(w, h), sg = sc.getContext('2d'); sg.drawImage(src || c, 0, 0); sg.globalCompositeOperation = 'source-in'; sg.fillStyle = col; sg.fillRect(0, 0, w, h); return sc; };
+  const out = makeCanvas(w, h), o = out.getContext('2d');
+  if (st.edge) { // an outline: the silhouette stamped around the picture
+    const r = Math.max(1, Math.round(st.edgeW * scale)), sil = silhouette(st.edge);
+    for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; o.drawImage(sil, Math.round(Math.cos(a) * r), Math.round(Math.sin(a) * r)); }
+    o.drawImage(c, 0, 0);
+  }
+  if (st.glow) { o.shadowColor = st.glow; o.shadowBlur = 2.6 * scale; o.drawImage(c, 0, 0); o.shadowBlur = 0; o.shadowColor = 'transparent'; }
+  if (st.rim) { // light catching the top edges
+    const sil = silhouette(st.rim), cut = sil.getContext('2d'), dy = Math.max(1, Math.round(0.9 * scale));
+    cut.globalCompositeOperation = 'destination-out'; cut.drawImage(silhouette('#000'), 0, dy);
+    o.globalAlpha = 0.85; o.drawImage(sil, 0, 0); o.globalAlpha = 1;
+  }
+  return out;
 }
 function dimSprite(s, key) { // explored but out of sight: a darker copy
   const k = key + '|dim@' + sprBucket;
@@ -2022,10 +2138,12 @@ function objSprite(kind, key, paint, dim) {
 }
 
 /* drawing primitives */
-function diamondPath(x, y, inset) {
-  const i = inset || 0, hw = TW / 2 - i * 2;
+function diamondPath(x, y, inset) { // a tile's top face; x, y as from wxOf, wyOf
+  const i = inset || 0;
   ctx.beginPath();
-  ctx.moveTo(x, y + i); ctx.lineTo(x + hw, y + TH / 2); ctx.lineTo(x, y + TH - i); ctx.lineTo(x - hw, y + TH / 2); ctx.closePath();
+  if (!ROT) { const hw = TW / 2 - i * 2; ctx.moveTo(x, y + i); ctx.lineTo(x + hw, y + TH / 2); ctx.lineTo(x, y + TH - i); ctx.lineTo(x - hw, y + TH / 2); ctx.closePath(); return; }
+  const k = (1 - i / 16) / 2, cx = x, cy = y + TH / 2, ax = E1x * k, ay = E1y * k, bx = E2x * k, by = E2y * k;
+  ctx.moveTo(cx - ax - bx, cy - ay - by); ctx.lineTo(cx + ax - bx, cy + ay - by); ctx.lineTo(cx + ax + bx, cy + ay + by); ctx.lineTo(cx - ax + bx, cy - ay + by); ctx.closePath();
 }
 function diamond(x, y, fill, stroke, lw, inset) {
   diamondPath(x, y, inset);
@@ -2139,38 +2257,80 @@ function frond(tx, ty, a, L, w, light, dark) {
 
 /* terrain painters */
 function sideFace(a, b, col, lip) {
-  const d = LH, g = ctx.createLinearGradient(0, Math.min(a[1], b[1]), 0, Math.max(a[1], b[1]) + d);
+  const d = LH;
+  if (theme === 'nostalgic') { // flat colour and a black outline
+    poly([a, b, [b[0], b[1] + d], [a[0], a[1] + d]], shade(col, -0.12), '#000', 1);
+    poly([a, b, [b[0], b[1] + 2.6], [a[0], a[1] + 2.6]], lip);
+    return;
+  }
+  if (theme === 'scifi') { col = mix(col, '#3a4668', 0.78); lip = 'rgba(90,240,255,.9)'; } // plated metal with a neon strip
+  const g = ctx.createLinearGradient(0, Math.min(a[1], b[1]), 0, Math.max(a[1], b[1]) + d);
   g.addColorStop(0, shade(col, 0.04)); g.addColorStop(1, shade(col, -0.34));
   poly([a, b, [b[0], b[1] + d], [a[0], a[1] + d]], g);
   ctx.strokeStyle = 'rgba(0,0,0,.13)'; ctx.lineWidth = 0.8;
   line(a[0], a[1] + d * 0.56, b[0], b[1] + d * 0.56);
   line(a[0], a[1] + d * 0.8, b[0], b[1] + d * 0.8);
-  poly([a, b, [b[0], b[1] + 2.6], [a[0], a[1] + 2.6]], lip);
+  poly([a, b, [b[0], b[1] + (theme === 'scifi' ? 1.3 : 2.6)], [a[0], a[1] + (theme === 'scifi' ? 1.3 : 2.6)]], lip);
+  if (theme === 'fantasy') poly([a, b, [b[0], b[1] + d], [a[0], a[1] + d]], null, 'rgba(52,28,8,.55)', 0.9); // a storybook ink line
 }
 // One land slab: earthy cliff sides, a faceted top, fine texture and small ground details.
 function paintLandTile(x, y, wx, wy, cl, tl) {
-  const L = [wx - 32, wy + 16], Tp = [wx, wy], R = [wx + 32, wy + 16], B = [wx, wy + 32];
-  sideFace(L, B, cl.side, cl.lip);
-  sideFace(B, R, cl.side2, shade(cl.lip, -0.14));
+  const mx = wx, my = wy + 16, P = (dx, dy) => isoP(mx, my, dx, dy);
+  const L = P(-32, 0), Tp = P(0, -16), R = P(32, 0), B = P(0, 16);
+  const edges = [[0, -1, Tp, R], [1, 0, R, B], [0, 1, B, L], [-1, 0, L, Tp]]; // the neighbour each edge faces
+  for (const [dx, dy, a, b] of [edges[2], edges[1], edges[0], edges[3]]) if (facesViewer(dx, dy)) {
+    const right = dx * E1x + dy * E2x > 0, lo = a[0] < b[0] ? [a, b] : [b, a];
+    sideFace(lo[0], lo[1], right ? cl.side2 : cl.side, right ? shade(cl.lip, -0.14) : cl.lip);
+  }
   const j = (k, r) => (hash(x, y, k) - 0.5) * r;
-  const C = [wx + j(1, 10), wy + 16 + j(2, 5)], tone = j(3, 0.07);
+  const C = P(j(1, 10), j(2, 5)), tone = j(3, 0.07);
   const rocky = tl.t === 'mountain';
-  const top = rocky ? mix(cl.top, cl.rock[0], 0.22) : cl.top, top2 = rocky ? mix(cl.top2, cl.rock[1], 0.25) : cl.top2;
-  diamond(wx, wy, shade(top, tone));
-  poly([Tp, L, C], shade(top, 0.05 + tone));
-  poly([Tp, R, C], shade(top, tone));
-  poly([L, B, C], shade(top2, tone + 0.01));
-  poly([R, B, C], shade(top2, tone - 0.04));
-  for (let i = 0; i < 10; i++) {
-    const px = wx + j(10 + i, 48), py = wy + 16 + j(30 + i, 22);
-    if (Math.abs(px - wx) / 30 + Math.abs(py - wy - 16) / 15 > 0.86) continue;
+  let top = rocky ? mix(cl.top, cl.rock[0], 0.22) : cl.top, top2 = rocky ? mix(cl.top2, cl.rock[1], 0.25) : cl.top2;
+  if (theme === 'scifi') { top = mix(top, '#5a6a8c', 0.42); top2 = mix(top2, '#3e4c6e', 0.45); } // dark plating that keeps a hint of the land
+  else if (theme === 'fantasy') { top = mix(top, '#f2d27a', 0.12); top2 = mix(top2, '#6f9440', 0.1); }
+  if (theme === 'nostalgic') { // one flat colour, dithered with the second
+    diamond(wx, wy, top);
+    ctx.save(); diamondPath(wx, wy, 0); ctx.clip(); ctx.fillStyle = top2;
+    for (let i = -4; i <= 4; i++) for (let k = -3; k <= 3; k++) if (((i + k) & 1) === 0 && hash(x, y, 300 + i * 11 + k) < 0.45) { const [px, py] = P(i * 7, k * 4); ctx.fillRect(Math.round(px) - 2, Math.round(py) - 1, 4, 2); }
+    ctx.restore();
+  } else {
+    diamond(wx, wy, shade(top, tone));
+    poly([Tp, L, C], shade(top, 0.05 + tone));
+    poly([Tp, R, C], shade(top, tone));
+    poly([L, B, C], shade(top2, tone + 0.01));
+    poly([R, B, C], shade(top2, tone - 0.04));
+  }
+  if (theme === 'scifi') { // circuit lines and glowing nodes
+    diamond(wx, wy, null, 'rgba(110,245,255,.2)', 0.8, 4);
+    const a = P(j(60, 30), j(61, 12)), b = P(j(62, 30), j(63, 12));
+    ctx.strokeStyle = 'rgba(110,245,255,.28)'; ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+    circle(a[0], a[1], 1.1, 'rgba(140,250,255,.9)'); circle(b[0], b[1], 0.9, 'rgba(255,120,240,.8)');
+  } else if (theme === 'fantasy') { // a few brush strokes of sunlight
+    ctx.strokeStyle = shade(top, 0.22); ctx.lineWidth = 1.4; ctx.lineCap = 'round';
+    for (let i = 0; i < 3; i++) { const p = P(j(64 + i, 34), j(68 + i, 14)); ctx.beginPath(); ctx.moveTo(p[0] - 4, p[1] + 1); ctx.quadraticCurveTo(p[0], p[1] - 1.5, p[0] + 4, p[1]); ctx.stroke(); }
+    ctx.lineCap = 'butt';
+  }
+  for (let i = 0; i < (theme === 'nostalgic' || theme === 'scifi' ? 0 : 10); i++) {
+    const dx = j(10 + i, 48), dy = j(30 + i, 22);
+    if (Math.abs(dx) / 30 + Math.abs(dy) / 15 > 0.86) continue;
+    const [px, py] = P(dx, dy);
     ellipse(px, py, 1.3, 0.65, i % 2 ? shade(cl.speck, 0.12) : shade(cl.speck, rocky ? -0.25 : -0.1));
   }
   ctx.lineWidth = 1;
-  ctx.strokeStyle = 'rgba(255,255,255,.26)';
-  ctx.beginPath(); ctx.moveTo(L[0] + 1, L[1]); ctx.lineTo(Tp[0], Tp[1] + 0.5); ctx.lineTo(R[0] - 1, R[1]); ctx.stroke();
-  ctx.strokeStyle = 'rgba(30,20,10,.14)';
-  ctx.beginPath(); ctx.moveTo(L[0] + 1, L[1]); ctx.lineTo(B[0], B[1] - 0.5); ctx.lineTo(R[0] - 1, R[1]); ctx.stroke();
+  if (!ROT) {
+    ctx.strokeStyle = 'rgba(255,255,255,.26)';
+    ctx.beginPath(); ctx.moveTo(L[0] + 1, L[1]); ctx.lineTo(Tp[0], Tp[1] + 0.5); ctx.lineTo(R[0] - 1, R[1]); ctx.stroke();
+    ctx.strokeStyle = 'rgba(30,20,10,.14)';
+    ctx.beginPath(); ctx.moveTo(L[0] + 1, L[1]); ctx.lineTo(B[0], B[1] - 0.5); ctx.lineTo(R[0] - 1, R[1]); ctx.stroke();
+  } else for (const [dx, dy, a, b] of edges) { // light along the far edges, a dark line along the near ones
+    ctx.strokeStyle = facesViewer(dx, dy) ? 'rgba(30,20,10,.14)' : 'rgba(255,255,255,.26)';
+    line(a[0], a[1], b[0], b[1]);
+  }
+  if (theme === 'fantasy' || theme === 'nostalgic') { // an outline round the top: ink, or hard black pixels
+    ctx.strokeStyle = theme === 'fantasy' ? 'rgba(52,28,8,.5)' : '#000'; ctx.lineWidth = theme === 'fantasy' ? 0.9 : 1;
+    for (const [dx, dy, a, b] of edges) if (facesViewer(dx, dy) || theme === 'nostalgic') line(a[0], a[1], b[0], b[1]);
+  }
   if (tl.imp === 'farm') paintFarm(wx, wy, cl);
   else if (tl.t === 'land' && !tl.res && !tl.b && !tl.imp) paintDecor(x, y, wx, wy + 16, cl);
 }
@@ -2226,7 +2386,8 @@ function paintDecor(x, y, cx, cy, cl) {
   if (hash(x, y, 40) < 0.18) rock(cx + j(41, 24), cy + j(42, 9), 0.42, cl.rock);
 }
 function paintFarm(wx, wy, cl) {
-  const T0 = [wx, wy + 3], R0 = [wx + 26, wy + 16], B0 = [wx, wy + 29], L0 = [wx - 26, wy + 16], C0 = [wx, wy + 16];
+  const P = (dx, dy) => isoP(wx, wy + 16, dx, dy);
+  const T0 = P(0, -13), R0 = P(26, 0), B0 = P(0, 13), L0 = P(-26, 0), C0 = P(0, 0);
   const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
   const plots = [[T0, mid(T0, R0), C0, mid(L0, T0)], [mid(T0, R0), R0, mid(R0, B0), C0], [C0, mid(R0, B0), B0, mid(B0, L0)], [mid(L0, T0), C0, mid(B0, L0), L0]];
   const tints = cl.name === 'tundra' ? ['#e9dfb0', '#d9cf9c', '#c8d9a0', '#bda07a'] : ['#edca5d', '#ddb24a', '#b9cf62', '#b98a52'];
@@ -2235,8 +2396,8 @@ function paintFarm(wx, wy, cl) {
     ctx.save(); poly(p); ctx.clip();
     ctx.strokeStyle = shade(tints[i], -0.18); ctx.lineWidth = 0.9;
     for (let k = -7; k <= 7; k++) {
-      if (i % 2) line(wx + k * 6 - 40, wy - 4, wx + k * 6 + 40, wy + 36);
-      else line(wx + k * 6 - 40, wy + 36, wx + k * 6 + 40, wy - 4);
+      const a = P(k * 6 - 40, i % 2 ? -20 : 20), b = P(k * 6 + 40, i % 2 ? 20 : -20);
+      line(a[0], a[1], b[0], b[1]);
     }
     ctx.restore();
   });
@@ -3722,8 +3883,8 @@ function puffAt(x, y, i, t, grow) {
 }
 function cloudSprites() {
   return {
-    shadows: [0, 1, 2].map(i => getSprite('puffsh' + i, [-30, -24, 60, 48], () => paintPuffShadow(i))),
-    puffs: [0, 1, 2].map(i => getSprite('puff' + theme + i, [-25, -21, 52, 42], () => paintPuff(i))),
+    shadows: [0, 1, 2].map(i => getSprite('puffsh' + i, [-30, -24, 60, 48], () => paintPuffShadow(i), { plain: true })),
+    puffs: [0, 1, 2].map(i => getSprite('puff' + theme + i, [-25, -21, 52, 42], () => paintPuff(i), { plain: true })),
   };
 }
 function paintPuffs(list, t, sp) {
@@ -3741,13 +3902,13 @@ const cloudCaches = new Map();
 function cloudLayer(now, key) { // every resting cloud, painted once per change in what has been explored
   const id = G.seed + '|' + G.n;
   let c = cloudCaches.get(id);
-  if (c && (c.key === key || now - c.at < 150)) return c;
+  if (c && (c.key === key || now - c.at < 150 || (turning(now) && c.pk !== projKey))) return c;
   const n = G.n, V = G.vis[G.view], { X0, Y0, Wd, Ht } = groundDims(n), y0 = Y0 - 24, h = Ht + 48;
   const S = Math.min(groundScale(n), 1.3), pw = Math.ceil(Wd * S), ph = Math.ceil(h * S);
   const canvas = c && c.c.width === pw && c.c.height === ph ? c.c : makeCanvas(pw, ph), list = [];
-  for (let s = -4; s <= 2 * n + 2; s++) for (let x = Math.max(-2, s - n - 1); x <= Math.min(n + 1, s + 2); x++) {
-    const y = s - x;
-    if (y < -2 || y > n + 1) continue;
+  const order = tileOrder(-2, n + 1);
+  for (let i = 0; i < order.length; i += 2) {
+    const x = order[i], y = order[i + 1];
     if (x < 0 || y < 0 || x >= n || y >= n || !V[y][x]) list.push([x, y, 1, 0]);
   }
   const sp = cloudSprites();
@@ -3757,14 +3918,14 @@ function cloudLayer(now, key) { // every resting cloud, painted once per change 
     ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
     paintPuffs(list, 0, sp);
   });
-  c = { key, c: canvas, x: X0, y: y0, w: Wd, h, at: now };
+  c = { key, c: canvas, x: X0, y: y0, w: Wd, h, at: now, pk: projKey, b: layerBasis() };
   cloudCaches.delete(id); cloudCaches.set(id, c);
   if (cloudCaches.size > 2) cloudCaches.delete(cloudCaches.keys().next().value);
   return c;
 }
 function drawClouds(now, n, V, onScreen, key) {
   const t = reduceMotion ? 0 : now, layer = cloudLayer(now, key);
-  ctx.drawImage(layer.c, layer.x + Math.sin(t / 3200) * 1.6, layer.y + Math.cos(t / 4100) * 1, layer.w, layer.h);
+  drawLayer(layer, Math.sin(t / 3200) * 1.6, Math.cos(t / 4100) * 1);
   const parting = [];
   for (const [k, r] of revealAt) {
     if (now - r >= 900) { revealAt.delete(k); continue; }
@@ -3776,7 +3937,11 @@ function drawClouds(now, n, V, onScreen, key) {
 
 /* the ground: land slabs and sea, painted once into a big picture and redrawn only when it changes */
 const groundCaches = new Map();
-function groundDims(n) { return { X0: -32 * n - 140, Y0: -76, Wd: 64 * n + 280, Ht: 32 * n + 170 }; }
+function groundDims(n) {
+  if (!ROT) return { X0: -32 * n - 140, Y0: -76, Wd: 64 * n + 280, Ht: 32 * n + 170 };
+  const b = mapBounds(-2, n + 2);
+  return { X0: b.x0 - 12, Y0: b.y0 - 12, Wd: b.x1 - b.x0 + 24, Ht: b.y1 - b.y0 + 42 };
+}
 function groundScale(n) {
   const { Wd, Ht } = groundDims(n);
   return Math.max(0.6, Math.min(sprBucket, Math.sqrt(9e6 / (Wd * Ht))));
@@ -3792,12 +3957,23 @@ function groundKey() {
     if (t.b) bld++;
     if (t.road) bld += 1000;
   }
-  return `${ex}|${imp}|${res}|${bld}|${G.view}|${groundScale(G.n).toFixed(2)}|${G.edits || 0}|${theme}`; // edits: the map editor changed terrain
+  return `${ex}|${imp}|${res}|${bld}|${G.view}|${groundScale(G.n).toFixed(2)}|${G.edits || 0}|${theme}|${projKey}`; // edits: the map editor changed terrain
 }
+// A cached layer painted for an earlier camera angle, stretched into place until it is repainted.
+function drawLayer(L, dx, dy) {
+  if (L.pk === projKey) { ctx.drawImage(L.c, L.x + (dx || 0), L.y + (dy || 0), L.w, L.h); return; }
+  const [o1x, o1y, o2x, o2y] = L.b, det = o1x * o2y - o2x * o1y, qy = 32 * PIV();
+  const a = (E1x * o2y - E2x * o1y) / det, c = (E2x * o1x - E1x * o2x) / det, b = (E1y * o2y - E2y * o1y) / det, d = (E2y * o1x - E1y * o2x) / det;
+  ctx.save();
+  ctx.transform(a, b, c, d, -c * qy, qy - d * qy);
+  ctx.drawImage(L.c, L.x + (dx || 0), L.y + (dy || 0), L.w, L.h);
+  ctx.restore();
+}
+const layerBasis = () => [E1x, E1y, E2x, E2y];
 function ensureGround(now) {
   const id = G.seed + '|' + G.n, key = groundKey();
   let g = groundCaches.get(id);
-  if (g && (g.key === key || now - g.at < 150)) return g; // rebuilds are throttled; the last picture stands in briefly
+  if (g && (g.key === key || now - g.at < 150 || (turning(now) && g.pk !== projKey))) return g; // rebuilds are throttled; the last picture stands in briefly
   g = buildGround(g, key, now);
   groundCaches.delete(id); groundCaches.set(id, g);
   if (groundCaches.size > 2) groundCaches.delete(groundCaches.keys().next().value);
@@ -3812,7 +3988,7 @@ function buildGround(old, key, now) {
     ctx.setTransform(S, 0, 0, S, -X0 * S, -Y0 * S);
     paintGround(n, V, X0, Y0, Wd, Ht);
   });
-  return { key, c, x: X0, y: Y0, w: Wd, h: Ht, at: now };
+  return { key, c, x: X0, y: Y0, w: Wd, h: Ht, at: now, pk: projKey, b: layerBasis() };
 }
 function paintGround(n, V, X0, Y0, Wd, Ht) {
   // sea depth, measured from land the viewer has seen
@@ -3850,14 +4026,15 @@ function paintGround(n, V, X0, Y0, Wd, Ht) {
   };
   for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
     if (!V[y][x] || !isWater(T(x, y))) continue;
-    const wx = wxOf(x, y), wy = wyOf(x, y) + WOFF;
-    if (seenLand(x, y - 1)) edgeShade([wx, wy], [wx + 32, wy + 16], [-6.3, 3.2]);
-    if (seenLand(x - 1, y)) edgeShade([wx - 32, wy + 16], [wx, wy], [6.3, 3.2]);
+    const wx = wxOf(x, y), wy = wyOf(x, y) + WOFF, P = (dx, dy) => isoP(wx, wy + 16, dx, dy);
+    const L = P(-32, 0), Tp = P(0, -16), R = P(32, 0), B = P(0, 16);
+    for (const [dx, dy, a, b] of [[0, -1, Tp, R], [1, 0, R, B], [0, 1, B, L], [-1, 0, L, Tp]]) // water darkens under the land behind it
+      if (seenLand(x + dx, y + dy) && !facesViewer(dx, dy)) edgeShade(a, b, [-(dx * E1x + dy * E2x) * 0.197, -(dx * E1y + dy * E2y) * 0.197]);
   }
   // land slabs back to front; a cloud floor where the map is unexplored and around its edge
-  for (let s = -4; s <= 2 * n + 2; s++) for (let x = Math.max(-2, s - n - 1); x <= Math.min(n + 1, s + 2); x++) {
-    const y = s - x;
-    if (y < -2 || y > n + 1) continue;
+  const order = tileOrder(-2, n + 1);
+  for (let i = 0; i < order.length; i += 2) {
+    const x = order[i], y = order[i + 1];
     const wx = wxOf(x, y), wy = wyOf(x, y);
     if (x < 0 || y < 0 || x >= n || y >= n || !V[y][x]) { diamond(wx, wy + 3, TH_().fog, null, 0, -1.5); continue; }
     const tl = T(x, y);
@@ -3948,6 +4125,7 @@ function makeDemo() {
 
 
 /* things that move every frame */
+const FOAM = [[0, -1, [3, -11], [26, 0.5]], [-1, 0, [-26, 0.5], [-3, -11]], [1, 0, [26, -0.5], [3, 11]], [0, 1, [-3, 11], [-26, -0.5]]];
 function waterFx(x, y, wx, wy, deep, now, V) {
   const ph = now / 1300 + hash(x, y) * 6.283;
   ctx.strokeStyle = deep ? 'rgba(255,255,255,.16)' : 'rgba(255,255,255,.3)'; ctx.lineWidth = 1.1;
@@ -3961,8 +4139,10 @@ function waterFx(x, y, wx, wy, deep, now, V) {
   const land = (xx, yy) => inb(xx, yy) && V[yy][xx] && !isWater(T(xx, yy));
   ctx.strokeStyle = `rgba(255,255,255,${0.5 + 0.22 * Math.sin(now / 650 + x * 1.3 + y)})`; ctx.lineWidth = 2;
   ctx.beginPath();
-  if (land(x, y - 1)) { ctx.moveTo(wx + 3, wy + 5); ctx.lineTo(wx + 26, wy + 16.5); }
-  if (land(x - 1, y)) { ctx.moveTo(wx - 26, wy + 16.5); ctx.lineTo(wx - 3, wy + 5); }
+  for (const [dx, dy, a, b] of FOAM) if (land(x + dx, y + dy) && !facesViewer(dx, dy)) { // surf along the shore behind
+    const p = isoP(wx, wy + 16, a[0], a[1]), q = isoP(wx, wy + 16, b[0], b[1]);
+    ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]);
+  }
   ctx.stroke();
 }
 function drawFish(x, y, cx, cy, now, dim) {
@@ -4002,6 +4182,12 @@ function drawBuildingAt(tl, x, y, cx, cy, now, dim) {
   const pl = G.players[b.owner], tribe = pl.tribe, lv = Math.min(b.level, 8), tier = cityTier(b.level);
   blit(objSprite('city', `city|${tribe}|${lv}|${tier}|${b.capital ? 1 : 0}|${b.wall ? 1 : 0}`, () => paintCity(tribe, lv, b.capital, b.wall, tier), dim), cx, cy);
   if (tier >= 3 && !dim) cityGlow(cx, cy, tier, pl.color, now);
+  if (theme === 'scifi' && !dim) { // a shimmering force field over every city
+    const r = 31 + lv * 1.6, a = 0.16 + 0.06 * Math.sin(now / 700 + x * 1.7 + y);
+    const gr = ctx.createRadialGradient(cx, cy - 4, r * 0.35, cx, cy - 4, r * 1.02);
+    gr.addColorStop(0, 'rgba(80,220,255,0)'); gr.addColorStop(0.82, `rgba(80,220,255,${a * 0.6})`); gr.addColorStop(0.97, `rgba(170,250,255,${a * 1.6})`); gr.addColorStop(1, 'rgba(170,250,255,0)');
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.ellipse(cx, cy - 2, r, r * 0.95, 0, Math.PI, 0); ctx.ellipse(cx, cy - 2, r, r * 0.42, 0, 0, Math.PI); ctx.fill();
+  }
   if (b.capital && !dim) { const [fx, fy] = hallFlag(tribe, lv); waveFlag(cx + fx, cy + fy, pl.color, now, tribe); }
   labels.push({ x: cx, y: cy + 15, text: b.name, capital: b.capital, level: b.level, color: pl.color, pop: b.pop, need: popNeeded(b), ally: b.owner !== G.view && allied(b.owner, G.view) });
 }
@@ -4040,7 +4226,9 @@ function drawUnit(u, now, demoMode) {
   const bob = isSel ? -(1 - Math.cos(now / 170)) * 1.6 : water ? Math.sin(now / 420 + u.id) * 1.2 : 0;
   if (!water) {
     ellipse(cx + 1.5, cy + 0.5, 12.5, 5.2, 'rgba(10,20,30,.26)');
+    if (theme === 'scifi') { ctx.shadowColor = col; ctx.shadowBlur = 7; }
     ctx.strokeStyle = col; ctx.lineWidth = isSel ? 2.6 : 1.7; ctx.beginPath(); ctx.ellipse(cx, cy, 13, 5.5, 0, 0, 6.283); ctx.stroke();
+    ctx.shadowBlur = 0; ctx.shadowColor = 'transparent';
     if (isSel) { ctx.strokeStyle = `rgba(255,255,255,${0.5 + 0.4 * Math.sin(now / 200)})`; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(cx, cy, 16, 7, 0, 0, 6.283); ctx.stroke(); }
   } else {
     ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(cx, cy + 2, 19 + Math.sin(now / 500 + u.id) * 1.5, 5, 0, 0, 6.283); ctx.stroke();
@@ -4137,7 +4325,7 @@ function drawWorld(now, demoMode) {
   sprBudget = 16;
   const g = ensureGround(now);
   ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'medium';
-  ctx.drawImage(g.c, g.x, g.y, g.w, g.h);
+  drawLayer(g);
   const pulse = 0.5 + 0.5 * Math.sin(now / 250);
   const selU = !demoMode && sel && sel.kind === 'unit' ? unitById(sel.id) : null;
   const selX = demoMode ? -9 : selU ? selU.x : sel ? sel.x : -9, selY = demoMode ? -9 : selU ? selU.y : sel ? sel.y : -9;
@@ -4149,8 +4337,9 @@ function drawWorld(now, demoMode) {
   const detail = cam.z > 0.5;
 
   // flat overlays: moving water, borders, fog shading and highlights
-  for (let s = 0; s <= 2 * n - 2; s++) for (let x = Math.max(0, s - n + 1); x <= Math.min(s, n - 1); x++) {
-    const y = s - x, v = V[y][x];
+  const order = tileOrder(0, n - 1);
+  for (let oi = 0; oi < order.length; oi += 2) {
+    const x = order[oi], y = order[oi + 1], v = V[y][x];
     if (!v || !onScreen(x, y)) continue;
     const tl = T(x, y), water = isWater(tl), key = x + ',' + y;
     const wx = wxOf(x, y), wy = wyOf(x, y) + (water ? WOFF : 0);
@@ -4159,7 +4348,7 @@ function drawWorld(now, demoMode) {
     if (o >= 0) {
       const col = G.players[o].color, ov = (xx, yy) => (inb(xx, yy) ? own[yy][xx] : -2);
       diamond(wx, wy, col + '1e');
-      const i = 2, top = [wx, wy + i], right = [wx + TW / 2 - i * 2, wy + TH / 2], bot = [wx, wy + TH - i], left = [wx - TW / 2 + i * 2, wy + TH / 2];
+      const P = (dx, dy) => isoP(wx, wy + TH / 2, dx, dy), top = P(0, -14), right = P(28, 0), bot = P(0, 14), left = P(-28, 0);
       ctx.beginPath();
       if (ov(x, y - 1) !== o) { ctx.moveTo(...top); ctx.lineTo(...right); }
       if (ov(x + 1, y) !== o) { ctx.moveTo(...right); ctx.lineTo(...bot); }
@@ -4172,7 +4361,7 @@ function drawWorld(now, demoMode) {
     if (targetSet.has(key)) diamond(wx, wy, `rgba(255,60,40,${0.18 + 0.16 * pulse})`, '#ff5a3c', 2, 2);
     if (hover && hover.x === x && hover.y === y) diamond(wx, wy, 'rgba(255,255,255,.08)', 'rgba(255,255,255,.6)', 1.2, 1);
     if (x === selX && y === selY) {
-      const c = [[wx, wy], [wx + TW / 2, wy + TH / 2], [wx, wy + TH], [wx - TW / 2, wy + TH / 2]];
+      const c = [isoP(wx, wy + 16, 0, -16), isoP(wx, wy + 16, 32, 0), isoP(wx, wy + 16, 0, 16), isoP(wx, wy + 16, -32, 0)];
       ctx.strokeStyle = '#ffe27a'; ctx.lineWidth = 2.5; ctx.beginPath();
       for (let k = 0; k < 4; k++) {
         const p = c[k], a = c[(k + 3) % 4], b = c[(k + 1) % 4];
@@ -4184,8 +4373,8 @@ function drawWorld(now, demoMode) {
   }
 
   // objects and units, back to front
-  for (let s = 0; s <= 2 * n - 2; s++) for (let x = Math.max(0, s - n + 1); x <= Math.min(s, n - 1); x++) {
-    const y = s - x, v = V[y][x];
+  for (let oi = 0; oi < order.length; oi += 2) {
+    const x = order[oi], y = order[oi + 1], v = V[y][x];
     if (!v || !onScreen(x, y, 80)) continue;
     const tl = T(x, y), water = isWater(tl), cl = climateOf(tl), key = x + ',' + y, dim = v === 1;
     const wx = wxOf(x, y), wy = wyOf(x, y) + (water ? WOFF : 0), cx = wx, cy = wy + TH / 2;
@@ -4276,6 +4465,16 @@ function draw(now) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.fillStyle = bgGrad || '#0b2746'; ctx.fillRect(0, 0, W, H);
   drawBackdrop(now);
+  if (yawGoal) { // glide to the new camera angle
+    const k = 1 - Math.pow(1 - 0.16, frameK);
+    let ny = camYaw + (yawGoal.yaw - camYaw) * k, np = camPitch + (yawGoal.pitch - camPitch) * k;
+    if (Math.abs(yawGoal.yaw - ny) < 0.002 && Math.abs(yawGoal.pitch - np) < 0.001) {
+      ny = Math.atan2(Math.sin(yawGoal.yaw), Math.cos(yawGoal.yaw)); np = yawGoal.pitch; yawGoal = null;
+      if (Math.abs(ny) < 0.002) ny = 0;
+    }
+    turnCamera(ny, np);
+  }
+  if (needleYaw !== camYaw) { needleYaw = camYaw; $('turn-needle').style.transform = `rotate(${(-camYaw * 180 / Math.PI).toFixed(1)}deg)`; }
   const menuOpen = !$('menu').hidden;
   const useDemo = !G || (G.over && menuOpen);
   if (useDemo && !demo) demo = makeDemo();
@@ -4297,8 +4496,8 @@ function draw(now) {
       if (camGoal.z) cam.z += (camGoal.z - cam.z) * kz;
       if (Math.abs(camGoal.x - cam.x) + Math.abs(camGoal.y - cam.y) < 0.5 && (!camGoal.z || Math.abs(camGoal.z - cam.z) < 0.005)) camGoal = null;
     }
-    const lim = G.n * TW / 2;
-    cam.x = Math.max(-lim, Math.min(lim, cam.x)); cam.y = Math.max(-TH * 2, Math.min(G.n * TH + TH * 2, cam.y));
+    const mb = mapBounds(0, G.n);
+    cam.x = Math.max(mb.x0, Math.min(mb.x1, cam.x)); cam.y = Math.max(mb.y0 - TH * 2, Math.min(mb.y1 + TH * 2, cam.y));
   }
   const camUsed = { x: cam.x, y: cam.y, z: cam.z };
   try {
@@ -4488,16 +4687,22 @@ function onTap(mx, my) {
 }
 
 const pointers = new Map();
-let dragMoved = 0, pinchDist = 0;
+let dragMoved = 0, pinchDist = 0, twistAng = null, turnDrag = false;
 cv.addEventListener('pointerdown', e => {
   cv.setPointerCapture(e.pointerId);
   pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-  dragMoved = 0; pinchDist = 0;
+  dragMoved = 0; pinchDist = 0; twistAng = null;
+  turnDrag = turnOn && pointers.size === 1 && (e.button === 2 || e.button === 1 || (e.button === 0 && e.shiftKey)); // right or middle drag turns and tilts
 });
+cv.addEventListener('contextmenu', e => { if (turnOn) e.preventDefault(); });
 cv.addEventListener('pointermove', e => {
   const p = pointers.get(e.pointerId);
   if (!p) { if (G) hover = pick(e.clientX, e.clientY); return; }
-  if (pointers.size === 1) {
+  if (turnDrag && pointers.size === 1) {
+    const dx = e.clientX - p.x, dy = e.clientY - p.y;
+    dragMoved += Math.abs(dx) + Math.abs(dy);
+    yawGoal = null; turnCamera(camYaw + dx * 0.007, camPitch - dy * 0.0016);
+  } else if (pointers.size === 1) {
     const dx = e.clientX - p.x, dy = e.clientY - p.y;
     dragMoved += Math.abs(dx) + Math.abs(dy);
     if (dragMoved > 6) { cam.x -= dx / cam.z; cam.y -= dy / cam.z; camGoal = null; }
@@ -4507,14 +4712,20 @@ cv.addEventListener('pointermove', e => {
     const d = Math.hypot(e.clientX - other.x, e.clientY - other.y);
     if (pinchDist) zoomAt(d / pinchDist, (e.clientX + other.x) / 2, (e.clientY + other.y) / 2);
     pinchDist = d;
+    if (turnOn) { // twisting two fingers turns the camera
+      const ang = Math.atan2(e.clientY - other.y, e.clientX - other.x);
+      if (twistAng !== null) { let da = ang - twistAng; da = Math.atan2(Math.sin(da), Math.cos(da)); if (Math.abs(da) < 0.5) { yawGoal = null; turnCamera(camYaw + da, camPitch); } }
+      twistAng = ang;
+    }
   }
   p.x = e.clientX; p.y = e.clientY;
 });
 function endPointer(e, tap) {
   if (!pointers.has(e.pointerId)) return;
   pointers.delete(e.pointerId);
-  if (tap && pointers.size === 0 && dragMoved <= 6) onTap(e.clientX, e.clientY);
-  pinchDist = 0;
+  if (tap && pointers.size === 0 && dragMoved <= 6 && !turnDrag) onTap(e.clientX, e.clientY);
+  pinchDist = 0; twistAng = null;
+  if (!pointers.size) turnDrag = false;
 }
 cv.addEventListener('pointerup', e => endPointer(e, true));
 cv.addEventListener('pointercancel', e => endPointer(e, false));
@@ -4541,7 +4752,9 @@ addEventListener('keydown', e => {
   }
   if (!G || !$('menu').hidden || e.target.tagName === 'SELECT') return;
   const k = e.key.toLowerCase();
-  if (k === 'e') endTurn();
+  if (turnOn && (k === '[' || k === ']')) turnBy(k === '[' ? -1 : 1);
+  else if (turnOn && k === '\\') resetTurn();
+  else if (k === 'e') endTurn();
   else if (k === 'n') nextUnit();
   else if (k === 't') toggleTech();
 });
@@ -4691,6 +4904,7 @@ $('btn-start').onclick = () => {
 function banner(title, sub) { toast(sub ? `${title} · ${sub}` : title); }
 function showGame(show) {
   gameShown = show;
+  showTurnCtl();
   $('editor-bar').hidden = !(show && editing);
   $('hud').hidden = !show; $('menu').hidden = show;
   $('game-menu').hidden = true;
@@ -4800,6 +5014,7 @@ function renderPrefs() {
   $('set-sound').textContent = muted ? 'Sound: off' : 'Sound: on';
   $('set-fx').textContent = !postfx.available ? 'Shaders: unavailable' : postfx.on ? 'Shaders: on' : 'Shaders: off';
   $('set-fx').disabled = !postfx.available;
+  $('set-turn').textContent = turnOn ? 'Camera turning: on' : 'Camera turning: off';
 }
 function openPrefs() { sfx('click'); renderPrefs(); $('prefs').hidden = false; }
 const closePrefs = () => { $('prefs').hidden = true; };
@@ -4819,6 +5034,25 @@ $('set-sound').onclick = () => {
   renderPrefs();
 };
 $('set-fx').onclick = () => { postfx.toggle(); sfx('click'); renderPrefs(); };
+$('set-turn').onclick = () => {
+  turnOn = !turnOn;
+  try { localStorage.setItem('polyweb-turn', turnOn ? '1' : '0'); } catch (e) { /* ignore */ }
+  if (!turnOn) { yawGoal = null; turnCamera(0, 0.5); }
+  sfx('click'); renderPrefs(); showTurnCtl();
+};
+function turnBy(dir) { // a quarter-turn of the compass, an eighth of a circle
+  const from = yawGoal ? yawGoal.yaw : camYaw, step = Math.PI / 4;
+  yawGoal = { yaw: Math.round(from / step) * step + dir * step, pitch: yawGoal ? yawGoal.pitch : camPitch };
+}
+function resetTurn() { // back to the standard view, the short way round
+  const y = Math.atan2(Math.sin(camYaw), Math.cos(camYaw));
+  if (y !== camYaw) turnCamera(y, camPitch);
+  yawGoal = { yaw: 0, pitch: 0.5 };
+}
+function showTurnCtl() { $('turn-ctl').hidden = !(turnOn && gameShown); }
+$('turn-left').onclick = () => { sfx('click'); turnBy(-1); };
+$('turn-right').onclick = () => { sfx('click'); turnBy(1); };
+$('turn-reset').onclick = () => { sfx('click'); resetTurn(); };
 let confirmBreak = -1;
 $('gm-tribes').addEventListener('click', e => {
   const b = e.target.closest('button.dip');
