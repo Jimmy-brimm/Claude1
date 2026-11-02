@@ -6,7 +6,7 @@
 <title>Polyweb</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@400;600;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;800&family=Orbitron:wght@500;700;900&family=Exo+2:wght@400;600;800&family=Cinzel:wght@600;700;900&family=Alegreya:wght@400;600;800&family=Press+Start+2P&family=Pixelify+Sans:wght@400;600;700&display=swap">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -64,6 +64,13 @@
   </div>
 </div>
 
+<!-- Camera turning (when switched on in Settings) -->
+<div id="turn-ctl" hidden>
+  <button id="turn-left" title="Turn left ( [ )" aria-label="Turn the camera left"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12a7 7 0 1 0 2.1-5"/><path d="M4 3v4.5h4.5"/></svg></button>
+  <button id="turn-reset" title="Face the standard way ( \ )" aria-label="Reset the camera"><svg id="turn-needle" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 3.5l3.6 8.5H8.4z" class="n"/><path d="M12 20.5L8.4 12h7.2z" class="s"/></svg></button>
+  <button id="turn-right" title="Turn right ( ] )" aria-label="Turn the camera right"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12a7 7 0 1 1-2.1-5"/><path d="M20 3v4.5h-4.5"/></svg></button>
+</div>
+
 <!-- Start screens -->
 <div id="menu" class="overlay">
   <section class="screen" id="scr-home">
@@ -77,6 +84,7 @@
       <button class="btn blue" id="btn-mp">Pass &amp; Play</button>
       <button class="btn blue" id="btn-online">Online Play</button>
       <button class="btn blue" id="btn-maps">Map Editor</button>
+      <button class="btn dark" id="btn-settings">Settings</button>
       <button class="btn dark" id="btn-howto">How to Play</button>
     </div>
     <p class="build muted">Version <span id="build">dev</span></p>
@@ -166,13 +174,31 @@
     <div id="gm-tribes"></div>
     <div class="stack">
       <button class="btn green" id="gm-resume">Resume</button>
-      <button class="btn blue" id="gm-sound">Sound: on</button>
-      <button class="btn blue" id="gm-fx">Shaders: on</button>
+      <button class="btn blue" id="gm-settings">Settings</button>
       <button class="btn blue" id="gm-invite" hidden>Invite players</button>
       <button class="btn blue" id="gm-seat" hidden>Play on another device</button>
       <button class="btn blue" id="gm-help">How to Play</button>
       <button class="btn dark" id="gm-main">Main Menu</button>
     </div>
+  </div>
+</div>
+
+<!-- Settings: the look of the game, sound and shaders -->
+<div id="prefs" class="overlay" hidden>
+  <div class="popup wide">
+    <button class="x" id="btn-prefs-close" aria-label="Close settings">&#10005;</button>
+    <h2>Settings</h2>
+    <span class="set-label">Style</span>
+    <div id="theme-grid" role="radiogroup" aria-label="Style"></div>
+    <span class="set-label">Game</span>
+    <div class="prefs-row">
+      <button class="btn blue" id="set-sound">Sound: on</button>
+      <button class="btn blue" id="set-fx">Shaders: on</button>
+      <button class="btn blue" id="set-turn">Camera turning: off</button>
+    </div>
+    <p class="muted prefs-note" id="turn-note">Camera turning: use the arrows at the top right, <kbd>[</kbd> <kbd>]</kbd>, right-drag (up and down tilts), or twist two fingers.</p>
+    <p class="muted prefs-note">Saved on this device. Every player can pick their own style, even in the same online game.</p>
+    <div class="row center"><button class="btn green" id="btn-prefs-done">Done</button></div>
   </div>
 </div>
 
@@ -233,7 +259,9 @@
       <li><b>Tribes.</b> Click any tribe's name to see how friendly it is and what it has. Tidekin, Ironclad and Sylvan have tech trees of their own.</li>
       <li><b>Map Editor</b> on the main menu lets you paint your own world at any size from 10×10 to 64×64 and play on it.</li>
       <li><b>Saving.</b> There are three save slots. Pick one when you start a game; it saves after every turn. Load or delete games under Saved Games.</li>
-      <li><b>Controls.</b> Drag to pan, scroll or pinch to zoom. <kbd>E</kbd> end turn, <kbd>N</kbd> next unit, <kbd>T</kbd> tech tree, <kbd>Esc</kbd> close or deselect. Shaders can be switched off in the Game menu.</li>
+      <li><b>Controls.</b> Drag to pan, scroll or pinch to zoom. <kbd>E</kbd> end turn, <kbd>N</kbd> next unit, <kbd>T</kbd> tech tree, <kbd>Esc</kbd> close or deselect. Shaders can be switched off in Settings.</li>
+      <li><b>Settings</b> (on the main menu and in the Game menu) change the look of the whole game, menus and land alike, and each style has its own cities and troops (sci-fi troopers on hoverbikes and glass-tower cities, fantasy knights, wizards and castles, or pixel-art armies): <i>Standard</i> (Polyweb's own faceted panels, hexagon buttons and paper-cut art), <i>Sci-fi</i> (neon panels, metal-plated land, force-field cities, a starfield), <i>Fantasy</i> (wood and gold, storybook ink outlines, warm light) or <i>Nostalgic</i> (chunky pixels, an 8-bit palette, black outlines, TV scanlines). Your choice is kept on this device.</li>
+      <li><b>Camera turning</b> (switch it on in Settings) lets you spin the map and tilt the view: use the arrows at the top right (the compass in the middle faces the standard way again), <kbd>[</kbd> and <kbd>]</kbd>, drag with the right mouse button (up and down tilts), or twist two fingers. The map turns in 3D while trees, cities and units stay upright pictures.</li>
     </ul>
     <div class="row center"><button class="btn green" id="btn-help-close">Got it</button></div>
   </div>
