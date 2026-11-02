@@ -3097,6 +3097,7 @@ function paintPlaza(style) {
   for (let k = 1; k < 4; k++) { const t = k / 4; line(-22 + 22 * t, -11 * t, 22 * t, 11 - 11 * t); }
 }
 function paintCity(tribe, level, capital, wall, tier = 0) {
+  if (themedCity(tribe, level, capital, wall, tier)) return; // and its own cities
   const col = TRIBES[tribe].color, pal = { roof: col, roof2: shade(col, -0.24) };
   if (level >= 2) paintPlaza(tribe);
   if (wall) cityWalls(tribe, false);
@@ -3503,7 +3504,604 @@ function paintBoat(col, tribe, ship) {
   }
   ellipse(-16, 1.5, 3, 1, 'rgba(255,255,255,.55)'); ellipse(16, 1.5, 3, 1, 'rgba(255,255,255,.55)');
 }
+/* ---------- style designs: every style has its own troops and cities ---------- */
+// What each unit is, so a style can draw its own version of it. Units not listed keep their usual picture.
+const UNIT_ROLE = {
+  warrior: 'trooper', swordsman: 'blade', defender: 'guard', archer: 'ranged', warden: 'ranged', mindbender: 'mystic', shaman: 'mystic',
+  paladin: 'champion', trident: 'harpoon', automaton: 'android', giant: 'colossus', jungletitan: 'colossus', suncolossus: 'colossus', seatitan: 'colossus',
+  stonegiant: 'mech', magmatitan: 'mech', crystalcolossus: 'mech', golem: 'mech', warengine: 'tank',
+  rider: 'mount', knight: 'heavymount', horsearcher: 'rangedmount', stormlord: 'supermount', catapult: 'siege', trebuchet: 'bigsiege',
+};
+const BOAT_RIDER = { archer: 'ranged', defender: 'guard', swordsman: 'blade', mindbender: 'mystic', shaman: 'mystic', paladin: 'champion', horsearcher: 'ranged', knight: 'blade' };
+
+/* Sci-fi: armoured troopers with glowing visors, hoverbikes, mechs, hover artillery and hover boats */
+const SCI = { suit: '#2f3548', suit2: '#22273a', metal: '#d8dee9', metal2: '#9aa4b8', glow: '#62f4ff', dark: '#151821' };
+function sciArm(w, hx, hy, col) {
+  poly([[w - 2.6, -18.4], [w + 0.4, -18.2], [hx + 1.3, hy + 0.6], [hx - 1.5, hy + 1]], SCI.suit);
+  circle(hx, hy, 1.9, col);
+}
+function sciBody(col, o = {}) { // feet at 0, helmet at (0.6, -25.4); returns the shoulder half-width
+  const dk = shade(col, -0.28), w = o.big ? 7.4 : 6.4, android = o.android;
+  const suit = android ? '#9aa2ad' : SCI.suit, suit2 = android ? '#78808b' : SCI.suit2;
+  if (!o.noPack && !android) { poly([[-w - 2.4, -8.6], [-w + 0.6, -8.6], [-w + 0.6, -19], [-w - 2.4, -19]], '#454d63'); ellipse(-w - 0.9, -8, 1.5, 0.8, 'rgba(98,244,255,.9)'); }
+  if (o.coat) { // a long coat instead of legs
+    poly([[-6.6, 0.4], [6.6, 0.4], [w - 1, -8], [-w + 1, -8]], SCI.suit); poly([[0.9, 0.4], [6.6, 0.4], [w - 1, -8], [0.9, -8]], SCI.suit2);
+    ctx.fillStyle = col; ctx.fillRect(-6.4, -1.4, 13, 1.2);
+  } else if (!o.noLegs) {
+    poly([[-4.4, 0], [-1, 0], [-1.2, -7.6], [-4.2, -7.6]], suit); poly([[1, 0], [4.4, 0], [4.2, -7.6], [1.2, -7.6]], suit2);
+    poly([[-4.7, -3.4], [-0.8, -3.4], [-1, -5.4], [-4.5, -5.4]], col); poly([[0.8, -3.4], [4.7, -3.4], [4.5, -5.4], [1, -5.4]], dk);
+    ellipse(-2.6, 0.1, 2.7, 1.1, SCI.dark); ellipse(2.8, 0.1, 2.7, 1.1, SCI.dark);
+  }
+  poly([[-w, -6.5], [w, -6.5], [w - 1, -19], [-w + 1, -19]], suit); poly([[0.9, -6.5], [w, -6.5], [w - 1, -19], [0.9, -19]], suit2);
+  if (android) { for (const [jx, jy] of [[-3, -9], [3, -9], [-4, -16], [4, -16]]) circle(jx, jy, 0.9, '#4a4f5a'); circle(0.6, -14, 1.8, col, '#3b3f4a', 0.6); circle(0.6, -14, 0.8, '#fff'); }
+  else {
+    poly([[-w + 1.6, -10], [w - 1.6, -10], [w - 2.2, -18.4], [-w + 2.2, -18.4]], col); poly([[0.9, -10], [w - 1.6, -10], [w - 2.2, -18.4], [0.9, -18.4]], dk);
+    ctx.fillStyle = 'rgba(98,244,255,.35)'; ctx.fillRect(-2.3, -17.2, 4.6, 5.4); ctx.fillStyle = SCI.glow; ctx.fillRect(-1.2, -16.2, 2.4, 3.4);
+  }
+  ctx.fillStyle = SCI.dark; ctx.fillRect(-w + 0.8, -9.2, 2 * w - 1.6, 1.8);
+  ellipse(-w + 0.6, -18.4, 3, 2.1, android ? '#b8c0ca' : col); ellipse(w - 0.4, -18.4, 3, 2.1, android ? '#9aa2ad' : dk);
+  const hx = 0.6, hy = -25.4, r = 6.2;
+  circle(hx, hy, r, android ? '#c4cbd4' : SCI.metal);
+  ctx.save(); ctx.beginPath(); ctx.arc(hx, hy, r, 0, 6.283); ctx.clip(); ctx.fillStyle = android ? '#9aa2ad' : SCI.metal2; ctx.fillRect(hx + 2.1, hy - r, r, 2 * r); ctx.restore();
+  if (android) { poly([[hx + 0.4, hy - 1.2], [hx + 6, hy - 1.4], [hx + 5.8, hy + 0.8], [hx + 0.6, hy + 1]], SCI.dark); circle(hx + 3.6, hy - 0.2, 1.2, col); }
+  else {
+    poly([[hx - 1, hy - 2.6], [hx + 6.5, hy - 2.8], [hx + 6.1, hy + 2.2], [hx - 0.6, hy + 2.4]], '#0d1630');
+    poly([[hx - 0.2, hy - 1.7], [hx + 5.9, hy - 1.9], [hx + 5.6, hy + 1.4], [hx + 0.2, hy + 1.5]], SCI.glow);
+    ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.fillRect(hx + 1, hy - 1.3, 2.3, 0.8);
+    poly([[hx - 5.8, hy - 1.6], [hx - 2.2, hy - 6.4], [hx - 0.6, hy - 5.8], [hx - 4.4, hy - 0.4]], col);
+  }
+  if (o.antenna) { ctx.strokeStyle = '#5c6680'; ctx.lineWidth = 0.8; line(hx - 3.6, hy - 4, hx - 5.8, hy - 11.5); circle(hx - 5.8, hy - 11.5, 1.1, '#ff5ce8'); }
+  return w;
+}
+function sciGun(w, col, long) { // a blaster rifle
+  const x0 = w - 3.4, y0 = -13.6, L = long ? 23 : 15;
+  poly([[x0 + 4, y0 + 1.4], [x0 + 6.6, y0 + 1.2], [x0 + 5.6, y0 + 5], [x0 + 3.4, y0 + 5]], SCI.suit2);
+  poly([[x0, y0 - 1.8], [x0 + L, y0 - 1.5], [x0 + L, y0 + 0.7], [x0, y0 + 1.7]], '#3a4155');
+  poly([[x0, y0 - 1.8], [x0 + L, y0 - 1.5], [x0 + L, y0 - 0.5], [x0, y0 - 0.4]], '#66708a');
+  ctx.fillStyle = col; ctx.fillRect(x0 + 2.6, y0 - 0.5, 5.4, 1.2);
+  if (long) { poly([[x0 + 7, y0 - 1.8], [x0 + 13, y0 - 1.7], [x0 + 12.6, y0 - 4], [x0 + 7.4, y0 - 4.1]], SCI.dark); circle(x0 + 13, y0 - 2.9, 0.9, SCI.glow); }
+  circle(x0 + L + 0.8, y0 - 0.4, 1.3, 'rgba(98,244,255,.45)'); circle(x0 + L + 0.5, y0 - 0.4, 0.8, SCI.glow);
+  sciArm(w, x0 + 5.2, y0 + 1.2, col);
+}
+function sciBlade(w, col, big) { // an energy sword
+  const x1 = w + 3, y1 = -15, x2 = w + (big ? 11 : 10), y2 = big ? -39 : -36;
+  ctx.lineCap = 'round';
+  ctx.globalAlpha = 0.35; ctx.strokeStyle = col; ctx.lineWidth = 5.5; line(x1, y1, x2, y2); ctx.globalAlpha = 1;
+  ctx.strokeStyle = shade(col, 0.45); ctx.lineWidth = 2.6; line(x1, y1, x2, y2);
+  ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1; line(x1 + 0.3, y1 - 1, x2 - 0.2, y2 + 1);
+  ctx.strokeStyle = '#3a4155'; ctx.lineWidth = 2.6; line(w + 1.4, -10.8, x1, y1); ctx.lineCap = 'butt';
+  sciArm(w, w + 1.8, -12, col);
+}
+function sciShield(col, x = 6, y = -14, r = 9.5) { // a hexagon of hard light
+  const hex = k => [...Array(6)].map((_, i) => [x + Math.cos(i * Math.PI / 3 + Math.PI / 6) * r * 0.66 * k, y + Math.sin(i * Math.PI / 3 + Math.PI / 6) * r * k]);
+  poly(hex(1), 'rgba(98,244,255,.26)', SCI.glow, 1.3);
+  poly(hex(0.6), null, 'rgba(255,255,255,.45)', 0.6);
+  circle(x, y, 1.6, col, '#ffffff', 0.5);
+}
+function sciTrooper(role, col, o = {}) {
+  const w = sciBody(col, { ...o, big: role === 'champion', android: role === 'android', coat: role === 'mystic', antenna: role === 'ranged' || role === 'mystic' });
+  switch (role) {
+    case 'blade': sciBlade(w, col); break;
+    case 'guard': sciArm(w, w + 1, -12, col); sciShield(col); break;
+    case 'ranged': sciGun(w, col, true); break;
+    case 'mystic': { // a hovering psionic drone
+      sciArm(w, w + 2.4, -14, col);
+      circle(w + 6, -33, 5.5, 'rgba(190,140,255,.22)'); ellipse(w + 6, -33, 4.4, 2, '#3a4155'); ellipse(w + 6, -33.8, 2.8, 1.4, '#c9a8ff');
+      circle(w + 6, -34.6, 1.1, '#ffffff'); ctx.strokeStyle = 'rgba(190,140,255,.7)'; ctx.lineWidth = 0.8; line(w + 3, -30.6, w + 2.4, -16); line(w + 9, -30.6, w + 3.4, -16);
+      break;
+    }
+    case 'champion': sciBlade(w, col, true); sciShield(col, 4, -15, 10.5); break;
+    case 'harpoon': // a harpoon gun with a three-pronged head
+      sciGun(w, col, false); ctx.strokeStyle = '#d9e4ee'; ctx.lineWidth = 1; const tx = w + 12.6; line(tx, -14, tx + 4, -14); line(tx + 4, -14, tx + 6, -16); line(tx + 4, -14, tx + 6.4, -14); line(tx + 4, -14, tx + 6, -12);
+      break;
+    case 'android': sciGun(w, col, false); break;
+    default: sciGun(w, col, false);
+  }
+}
+function sciBike(col, big) { // a hoverbike
+  ellipse(0, -0.6, 15, 3.2, 'rgba(98,244,255,.32)'); ellipse(0, -0.6, 9, 1.8, 'rgba(170,250,255,.6)');
+  poly([[-15, -7], [-7, -11.2], [10, -11.8], [18, -7.6], [13, -4], [-12, -4]], col);
+  poly([[-12, -4], [13, -4], [18, -7.6], [10, -6.2], [-13, -5.8]], shade(col, -0.32));
+  poly([[8, -11.8], [15.6, -15], [19, -8.4], [18, -7.6]], SCI.metal); poly([[15.6, -15], [19, -8.4], [17.2, -9.4]], SCI.metal2);
+  ellipse(-12.5, -6.4, 3.6, 2.6, '#3a4155'); circle(-15.2, -6.4, 1.5, SCI.glow);
+  poly([[-6.4, -11.2], [2.4, -11.6], [1.4, -13], [-5.6, -12.8]], SCI.dark);
+  ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.fillRect(-2, -10.6, 8, 0.8);
+  if (big) { ctx.strokeStyle = '#ffe27a'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(-18, -16); ctx.lineTo(-14, -11); ctx.lineTo(-17, -10); ctx.lineTo(-12, -4); ctx.stroke(); }
+}
+function sciMech(col, k = 1) { // a walking mech with a glass cockpit and arm cannons
+  ctx.save(); ctx.scale(k, k);
+  for (const [x, c] of [[-7, '#3a4155'], [7, '#2b3140']]) {
+    poly([[x - 3.2, -1], [x + 3.2, -1], [x + 2.4, -14], [x - 2.4, -14]], c);
+    poly([[x - 4.4, 0.8], [x + 4.4, 0.8], [x + 3.6, -2], [x - 3.6, -2]], SCI.dark); circle(x, -8, 2.3, col, SCI.dark, 0.6);
+  }
+  isoBox(0, -13, 11.5, 15, '#cdd4df', '#8f99ad', '#e6ebf2', 0);
+  poly([[-10, -18], [-2, -14], [-2, -21.6], [-10, -25.4]], '#0d1630'); poly([[-9.2, -18.6], [-2.8, -15.4], [-2.8, -21], [-9.2, -24.4]], 'rgba(98,244,255,.75)');
+  ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.fillRect(-8, -23, 2.6, 1);
+  poly([[1, -14.4], [11.5, -19.6], [11.5, -21.4], [1, -16.2]], col);
+  for (const s of [-1, 1]) { // arm cannons
+    const x = s * 15;
+    isoBox(x, -18, 3.4, 8, '#5c6680', '#3a4155', '#7f8aa3', 0);
+    poly([[x - 1.2, -20], [x + 1.2, -20], [x + 1.2 + s * 0, -10], [x - 1.2, -10]], SCI.dark);
+    circle(x, -9.6, 1.2, SCI.glow);
+  }
+  ctx.strokeStyle = '#5c6680'; ctx.lineWidth = 0.9; line(6, -30, 7, -38); circle(7, -38, 1.2, '#ff5ce8');
+  ctx.restore();
+}
+function sciArtillery(col, rail) { // a hover cannon, or a long railgun
+  ellipse(0, -1, 16, 3.6, 'rgba(98,244,255,.3)');
+  poly([[-15, -4], [15, -4], [12, -9.4], [-12, -9.4]], '#3a4155'); poly([[-15, -4], [15, -4], [14, -2.2], [-14, -2.2]], SCI.dark);
+  ctx.fillStyle = col; ctx.fillRect(-12, -7.6, 24, 1.3);
+  isoBox(-3, -9.4, 6.4, 6, '#cdd4df', '#8f99ad', '#e6ebf2', 0);
+  if (rail) {
+    for (const off of [-1.6, 1.6]) { ctx.strokeStyle = off < 0 ? '#9aa4b8' : '#5c6680'; ctx.lineWidth = 1.8; line(-2, -15 + off, 22, -31 + off); }
+    for (let t = 0.25; t < 1; t += 0.25) { const x = -2 + 24 * t, y = -15 - 16 * t; ctx.strokeStyle = SCI.glow; ctx.lineWidth = 1; line(x - 1, y + 2.6, x + 1, y - 2.6); }
+  } else {
+    ctx.strokeStyle = '#5c6680'; ctx.lineWidth = 4.6; ctx.lineCap = 'round'; line(-2, -15, 16, -27); ctx.lineCap = 'butt';
+    for (const t of [0.35, 0.6]) { const x = -2 + 18 * t, y = -15 - 12 * t; ctx.strokeStyle = col; ctx.lineWidth = 1.2; line(x - 1.4, y - 2, x + 1.4, y + 2); }
+    circle(16.6, -27.4, 1.7, SCI.glow);
+  }
+}
+function sciBoat(col, kind) {
+  ellipse(0, 2, kind === 'battleship' ? 27 : 21, 3.4, 'rgba(98,244,255,.3)');
+  if (kind === 'battleship') { // a hover cruiser with turrets and a radar dish
+    poly([[-26, -9], [22, -9], [28, -5], [20, 2], [-22, 2]], '#cdd4df'); poly([[-22, 2], [20, 2], [28, -5], [20, -3], [-24, -3]], '#8f99ad');
+    ctx.fillStyle = col; ctx.fillRect(-22, -6.2, 42, 1.6);
+    isoBox(-4, -9, 9, 7, '#9aa4b8', '#6e7890', '#cdd4df', 0); poly([[-11, -14], [-4, -11], [-4, -14.6], [-11, -17.4]], 'rgba(98,244,255,.8)');
+    for (const [x, d] of [[-17, -1], [13, 1]]) { isoBox(x, -9, 3.2, 3, '#5c6680', '#3a4155', '#7f8aa3', 0); ctx.strokeStyle = SCI.dark; ctx.lineWidth = 1.8; line(x, -12, x + d * 9, -14); }
+    ctx.strokeStyle = '#5c6680'; ctx.lineWidth = 1; line(-4, -20, -4, -30); ellipse(-4, -31, 4.4, 1.6, '#9aa4b8'); circle(-4, -31, 0.9, '#ff5ce8');
+  } else if (kind === 'ship') { // a hydrofoil gunship
+    poly([[-23, -8], [18, -8], [24, -4], [17, 2], [-19, 2]], '#cdd4df'); poly([[-19, 2], [17, 2], [24, -4], [16, -2.4], [-21, -2.4]], '#8f99ad');
+    ctx.fillStyle = col; ctx.fillRect(-19, -5.6, 36, 1.4);
+    dome(4, -8, 7, 'rgba(98,244,255,.7)', 'rgba(40,140,190,.7)', 0.8);
+    isoBox(-15, -8, 3, 3, '#5c6680', '#3a4155', '#7f8aa3', 0); ctx.strokeStyle = SCI.dark; ctx.lineWidth = 1.6; line(-15, -11, -24, -13);
+    ctx.strokeStyle = '#5c6680'; ctx.lineWidth = 1.4; line(-12, 2, -14, 6); line(12, 2, 14, 6);
+  } else { // a hover skiff with a tall fin
+    poly([[-17, -6], [14, -6], [19, -3], [13, 2], [-14, 2]], '#cdd4df'); poly([[-14, 2], [13, 2], [19, -3], [12, -1.6], [-16, -1.6]], '#8f99ad');
+    ctx.fillStyle = col; ctx.fillRect(-14, -4.2, 28, 1.3);
+    poly([[6, -6], [12, -24], [14, -23], [11.4, -6]], col); poly([[11.4, -6], [14, -23], [15, -21], [13, -6]], shade(col, -0.3));
+    circle(-15.5, -2, 1.5, SCI.glow);
+  }
+}
+function sciUnit(type, tribe, medium) {
+  const col = TRIBES[tribe].color, role = UNIT_ROLE[type];
+  if (medium !== 'land') {
+    sciBoat(col, medium === 'boat' ? 'boat' : medium);
+    ctx.save(); ctx.translate(-6, -7); ctx.scale(0.82, 0.82); sciTrooper(BOAT_RIDER[type] || 'trooper', col, { noLegs: true, noPack: true }); ctx.restore();
+    return true;
+  }
+  switch (role) {
+    case 'mount': case 'heavymount': case 'rangedmount': case 'supermount': {
+      const big = role === 'supermount';
+      ctx.save(); if (big) ctx.scale(1.3, 1.3);
+      sciBike(col, big);
+      ctx.translate(-1.6, -10.6); sciTrooper(role === 'rangedmount' ? 'ranged' : role === 'mount' ? 'trooper' : 'blade', col, { noLegs: true, noPack: true });
+      ctx.restore();
+      return true;
+    }
+    case 'siege': sciArtillery(col, false); return true;
+    case 'bigsiege': sciArtillery(col, true); return true;
+    case 'colossus': sciMech(col, 1.25); return true;
+    case 'mech': sciMech(col, 1.15); return true;
+    case 'tank': ctx.save(); ctx.scale(1.3, 1.3); sciArtillery(col, true); isoBox(6, -9.4, 4, 4, '#cdd4df', '#8f99ad', '#e6ebf2', 0); ctx.restore(); return true;
+    case undefined: return false; // beasts keep their own shapes
+    default: ctx.save(); if (role === 'champion') ctx.scale(1.1, 1.1); sciTrooper(role, col); ctx.restore(); return true;
+  }
+}
+
+/* Fantasy: caped storybook heroes, horses in heraldic cloth, a ballista, dragon-prow longships and galleons */
+const FAN = { gold: '#f2c75c', gold2: '#b8862a', steel: '#dfe5ec', steel2: '#a9b4c1', wood: '#8a5a33', wood2: '#5e3b1e', boot: '#4a2f1a' };
+function fanArm(w, hx, hy, col, skin) {
+  poly([[w - 2.6, -18.4], [w + 0.3, -18.2], [hx + 1.2, hy + 0.6], [hx - 1.4, hy + 1]], col);
+  circle(hx, hy, 1.85, skin);
+}
+function fanBody(col, skin, tribe, hat, o = {}) {
+  const w = o.big ? 7.2 : 6.3, dk = shade(col, -0.25), deep = shade(col, -0.45);
+  if (hat !== 'wizard') { // a cape flowing back from the shoulders
+    poly([[-w + 1, -19.4], [w - 2, -19.6], [-w - 4.6, -3.4], [-w - 1.2, -1.2]], deep);
+    poly([[-w + 1, -19.4], [-w - 0.6, -18], [-w - 4.6, -3.4]], shade(deep, -0.2));
+  }
+  if (o.robe) {
+    poly([[-7, 0.6], [7, 0.6], [w - 0.8, -8], [-w + 0.8, -8]], col); poly([[0.9, 0.6], [7, 0.6], [w - 0.8, -8], [0.9, -8]], dk);
+    ctx.fillStyle = FAN.gold; ctx.fillRect(-6.8, -1, 13.6, 1.1);
+    for (const sx of [-3.4, 2.6]) { ctx.fillStyle = '#fff6c8'; ctx.fillRect(sx, -5, 1, 1); }
+  } else if (!o.noLegs) {
+    poly([[-4.2, -3], [-1, -3], [-1, -7.4], [-4, -7.4]], deep); poly([[1, -3], [4.2, -3], [4, -7.4], [1, -7.4]], shade(deep, -0.15));
+    poly([[-4.6, 0], [-0.8, 0], [-1, -3.4], [-4.4, -3.4]], FAN.boot); poly([[0.8, 0], [4.8, 0], [4.4, -3.4], [1, -3.4]], shade(FAN.boot, -0.2));
+  }
+  const armour = o.armour, body = armour ? FAN.steel : col, body2 = armour ? FAN.steel2 : dk;
+  poly([[-w, -6.5], [w, -6.5], [w - 1.3, -19], [-w + 1.3, -19]], body); poly([[0.9, -6.5], [w, -6.5], [w - 1.3, -19], [0.9, -19]], body2);
+  poly([[-2.6, -6.5], [3.4, -6.5], [3, -18.6], [-2.2, -18.6]], col); // tabard
+  poly([[0.6, -6.5], [3.4, -6.5], [3, -18.6], [0.6, -18.6]], dk);
+  ctx.strokeStyle = FAN.gold; ctx.lineWidth = 0.6; ctx.beginPath(); ctx.moveTo(-2.6, -6.5); ctx.lineTo(-2.2, -18.6); ctx.moveTo(3.4, -6.5); ctx.lineTo(3, -18.6); ctx.stroke();
+  emblem(tribe, 0.4, -14.6, 0.7, luma(col) > 0.8 ? '#5a4a2a' : '#fff4d0');
+  ctx.fillStyle = '#4a2f1a'; ctx.fillRect(-w + 0.6, -10, 2 * w - 1.2, 1.8); ctx.fillStyle = FAN.gold; ctx.fillRect(-0.6, -10.2, 2, 2.2);
+  const hx = 0.6, hy = -25.4, r = 6;
+  circle(hx, hy, r, skin);
+  ctx.save(); ctx.beginPath(); ctx.arc(hx, hy, r, 0, 6.283); ctx.clip(); ctx.fillStyle = shade(skin, -0.16); ctx.fillRect(hx + 1.9, hy - r, r, 2 * r); ctx.restore();
+  ctx.fillStyle = '#1c1c1c'; ctx.fillRect(hx + 1.7, hy - 0.6, 1.3, 1.8); ctx.fillRect(hx + 4.1, hy - 0.6, 1.2, 1.7);
+  switch (hat) {
+    case 'horns': // a horned helm
+      ctx.beginPath(); ctx.arc(hx, hy - 0.6, r + 0.4, Math.PI, 0); ctx.closePath(); ctx.fillStyle = FAN.steel2; ctx.fill();
+      ctx.fillStyle = FAN.steel; ctx.fillRect(hx - r - 0.4, hy - 1.4, 2 * r + 0.8, 1.6);
+      for (const s of [-1, 1]) poly([[hx + s * 4.6, hy - 4], [hx + s * 9.4, hy - 10.6], [hx + s * 8.4, hy - 6.6], [hx + s * 6, hy - 3]], '#f4ecd6');
+      break;
+    case 'plume': // a knight's helm with a visor and a plume
+      circle(hx, hy, r + 0.4, FAN.steel);
+      ctx.save(); ctx.beginPath(); ctx.arc(hx, hy, r + 0.4, 0, 6.283); ctx.clip(); ctx.fillStyle = FAN.steel2; ctx.fillRect(hx + 2, hy - r - 1, r, 2 * r + 2); ctx.restore();
+      ctx.fillStyle = '#1c1c1c'; ctx.fillRect(hx - 0.6, hy - 1, 6.6, 1.3); ctx.fillRect(hx + 2.4, hy - 1, 0.8, 4);
+      ellipse(hx - 3, hy - 8.6, 3, 4.6, col, null, 0, -0.6); ellipse(hx - 4.4, hy - 8, 1.6, 3.2, shade(col, 0.3), null, 0, -0.6);
+      break;
+    case 'pike': // a pointed kettle helm
+      poly([[hx - r - 1.6, hy - 1.4], [hx + r + 1.6, hy - 1.4], [hx + 0.6, hy - 10]], FAN.steel); poly([[hx + 0.6, hy - 1.4], [hx + r + 1.6, hy - 1.4], [hx + 0.6, hy - 10]], FAN.steel2);
+      break;
+    case 'hood': // a ranger's hood
+      ctx.beginPath(); ctx.arc(hx, hy, r + 1, Math.PI * 0.85, Math.PI * 2.15); ctx.lineTo(hx - 4, hy - 12); ctx.closePath(); ctx.fillStyle = shade(col, -0.35); ctx.fill();
+      poly([[hx - 5.4, hy - 1], [hx - 6.6, hy + 4.6], [hx - 3.6, hy + 2]], skin); // a pointed ear
+      break;
+    case 'wizard': // a tall starry hat and a white beard
+      poly([[hx - 2.4, hy + 1.2], [hx + 6.4, hy + 1.4], [hx + 5.6, hy + 7], [hx + 2, hy + 10], [hx - 1, hy + 6]], '#f4f1ea');
+      ellipse(hx, hy - 4.6, 9.6, 2.6, shade(col, -0.2));
+      poly([[hx - 6, hy - 5], [hx + 6.6, hy - 5], [hx - 3, hy - 20], [hx - 4.2, hy - 15]], col);
+      poly([[hx + 0.6, hy - 5], [hx + 6.6, hy - 5], [hx - 3, hy - 20]], shade(col, -0.2));
+      for (const [sx, sy] of [[hx - 1, hy - 9], [hx + 2.4, hy - 6.6], [hx - 2.6, hy - 13]]) { ctx.fillStyle = FAN.gold; ctx.fillRect(sx - 0.7, sy - 0.7, 1.4, 1.4); }
+      break;
+    case 'halo': // a golden helm under a halo
+      circle(hx, hy, r + 0.4, FAN.gold); ctx.fillStyle = '#1c1c1c'; ctx.fillRect(hx - 0.6, hy - 1, 6.6, 1.3);
+      ctx.save(); ctx.beginPath(); ctx.arc(hx, hy, r + 0.4, 0, 6.283); ctx.clip(); ctx.fillStyle = FAN.gold2; ctx.fillRect(hx + 2.2, hy - r - 1, r, 2 * r + 2); ctx.restore();
+      ctx.strokeStyle = 'rgba(255,236,150,.95)'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.ellipse(hx, hy - 9.6, 6, 1.8, 0, 0, 6.283); ctx.stroke();
+      break;
+    case 'fin': // a sea crown
+      for (let k = -2; k <= 2; k++) poly([[hx + k * 2.4 - 1.2, hy - 4.6], [hx + k * 2.4, hy - 9 + Math.abs(k)], [hx + k * 2.4 + 1.2, hy - 4.6]], '#7fe0d8');
+      ctx.fillStyle = '#3aa8a0'; ctx.fillRect(hx - r, hy - 5, 2 * r, 1.6);
+      break;
+    default: // tousled hair
+      ctx.beginPath(); ctx.arc(hx, hy - 1, r + 0.2, Math.PI * 1.05, Math.PI * 1.95); ctx.closePath(); ctx.fillStyle = '#6b4226'; ctx.fill();
+  }
+  return w;
+}
+function kiteShield(col, tribe, x = 1.6, y = -21.5, s = 1) {
+  ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 9.4 * s, y); ctx.lineTo(x + 9.4 * s, y + 7 * s); ctx.quadraticCurveTo(x + 9 * s, y + 13 * s, x + 4.7 * s, y + 17.5 * s); ctx.quadraticCurveTo(x + 0.4 * s, y + 13 * s, x, y + 7 * s); ctx.closePath();
+  ctx.fillStyle = col; ctx.fill();
+  ctx.save(); ctx.clip(); ctx.fillStyle = shade(col, -0.18); ctx.fillRect(x + 4.7 * s, y, 10 * s, 20 * s); ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.fillRect(x, y + 5.4 * s, 10 * s, 1.6 * s); ctx.restore();
+  ctx.strokeStyle = FAN.gold; ctx.lineWidth = 1.2; ctx.stroke();
+  emblem(tribe, x + 4.7 * s, y + 10.6 * s, 0.9 * s, luma(col) > 0.8 ? '#5a4a2a' : '#fff4d0');
+}
+function fanHero(role, col, skin, tribe, o = {}) {
+  const hat = { trooper: 'horns', blade: 'plume', guard: 'pike', ranged: 'hood', mystic: 'wizard', champion: 'halo', harpoon: 'fin' }[role];
+  if (role === 'guard') { ctx.strokeStyle = FAN.wood2; ctx.lineWidth = 1.6; line(-7.4, 1, -7.4, -38); poly([[-9.6, -37], [-7.4, -44], [-5.2, -37]], FAN.steel); poly([[-9, -36], [-5.8, -36], [-7.4, -33]], col); }
+  if (role === 'ranged') { poly([[-8.8, -19.4], [-5.8, -20.4], [-3.8, -10.6], [-6.6, -9.8]], '#5e3b1e'); for (const [fx, fy] of [[-8.6, -21.4], [-6.8, -22.2]]) poly([[fx - 1, fy + 1.6], [fx, fy - 1.8], [fx + 1, fy + 1.6]], '#f4f1ea'); }
+  const w = fanBody(col, skin, tribe, hat, { ...o, big: role === 'champion', robe: role === 'mystic', armour: role === 'blade' || role === 'champion' || role === 'guard' });
+  switch (role) {
+    case 'trooper': // an axe and a round shield
+      circle(-w + 0.4, -12.4, 4.6, FAN.wood, FAN.wood2, 1); ctx.strokeStyle = FAN.wood2; ctx.lineWidth = 0.6; line(-w + 0.4, -17, -w + 0.4, -7.8); circle(-w + 0.4, -12.4, 1.5, FAN.steel);
+      ctx.strokeStyle = FAN.wood2; ctx.lineWidth = 1.7; line(w + 1.2, -9, w + 6.4, -27);
+      poly([[w + 5, -27.6], [w + 10.6, -26], [w + 9.6, -21], [w + 5.8, -23.4]], FAN.steel); poly([[w + 7.6, -26.8], [w + 10.6, -26], [w + 9.6, -21]], FAN.steel2);
+      fanArm(w, w + 1.6, -12.6, col, skin);
+      break;
+    case 'blade': // a longsword and a kite shield
+      blade(w + 2.6, -13, w + 9.6, -37, 2.6, '#f4f8fb', '#b9c4d0'); ctx.strokeStyle = FAN.gold; ctx.lineWidth = 2.2; line(w - 0.6, -15, w + 5.8, -11.4);
+      fanArm(w, w + 1.8, -12.6, col, skin); kiteShield(col, tribe);
+      break;
+    case 'guard': fanArm(w, w + 1, -12, col, skin); kiteShield(col, tribe, 0.6, -23, 1.15); break;
+    case 'ranged': { // an elegant longbow with gilded tips
+      const cx = w + 3, cy = -15;
+      ctx.lineWidth = 2; ctx.strokeStyle = '#6b3f1e'; ctx.beginPath(); ctx.arc(cx - 4, cy, 12, -1.15, 1.15); ctx.stroke();
+      const ex = cx - 4 + 12 * Math.cos(1.15), ey = 12 * Math.sin(1.15);
+      circle(ex, cy - ey, 1, FAN.gold); circle(ex, cy + ey, 1, FAN.gold);
+      ctx.strokeStyle = '#f3ead6'; ctx.lineWidth = 0.6; line(ex, cy - ey, ex - 3.6, cy); line(ex - 3.6, cy, ex, cy + ey);
+      ctx.strokeStyle = '#e8d7b0'; ctx.lineWidth = 0.9; line(ex - 3.6, cy, cx + 10, cy); poly([[cx + 10, cy - 1.3], [cx + 12.6, cy], [cx + 10, cy + 1.3]], FAN.steel);
+      fanArm(w, cx + 7, cy, col, skin);
+      break;
+    }
+    case 'mystic': // a staff crowned with a glowing crystal
+      ctx.strokeStyle = '#6b4226'; ctx.lineWidth = 1.6; line(w + 2, 0, w + 4.6, -30);
+      circle(w + 4.8, -34, 5.6, `rgba(${col === '#ffffff' ? '200,220,255' : '190,150,255'},.25)`);
+      poly([[w + 4.8, -39.4], [w + 7.2, -34], [w + 4.8, -29.6], [w + 2.4, -34]], shade(col, 0.4), '#ffffff', 0.6);
+      fanArm(w, w + 2.8, -13, col, skin);
+      break;
+    case 'champion': // a shining holy sword and a great shield
+      ctx.save(); ctx.globalAlpha = 0.35; ctx.strokeStyle = '#ffe9a0'; ctx.lineWidth = 6; ctx.lineCap = 'round'; line(w + 3, -14, w + 10, -38); ctx.restore();
+      blade(w + 3, -14, w + 10, -38, 2.8, '#fffbe8', '#e8d38a'); ctx.strokeStyle = FAN.gold; ctx.lineWidth = 2.2; line(w, -16, w + 6.4, -12.2);
+      fanArm(w, w + 2.2, -13.4, col, skin); kiteShield('#f4f1ea', tribe, 0.6, -23, 1.15);
+      break;
+    case 'harpoon':
+      ctx.strokeStyle = FAN.gold2; ctx.lineWidth = 1.5; line(w - 3, -1, w + 6, -33);
+      ctx.strokeStyle = FAN.gold; ctx.lineWidth = 1.2; line(w + 3.4, -34, w + 8.6, -31.6); line(w + 3.4, -34, w + 3, -38.6); line(w + 6, -33, w + 6.2, -38.8); line(w + 8.6, -31.6, w + 9.6, -36.4);
+      fanArm(w, w + 1.4, -14, col, skin);
+      break;
+  }
+}
+function fanOgre(col) { // a green-skinned ogre with a club
+  const skin = '#8fb069', sk2 = '#6f8f4e';
+  poly([[-5, 0], [-1.2, 0], [-1.6, -8], [-5.2, -8]], sk2); poly([[1.2, 0], [5, 0], [5.2, -8], [1.6, -8]], sk2);
+  ellipse(0, -15, 9, 9, skin); ctx.save(); ctx.beginPath(); ctx.ellipse(0, -15, 9, 9, 0, 0, 6.283); ctx.clip(); ctx.fillStyle = sk2; ctx.fillRect(2, -25, 9, 20); ctx.restore();
+  poly([[-8, -9], [8, -9], [6, -4], [-6, -4]], col); poly([[0.6, -9], [8, -9], [6, -4], [0.6, -4]], shade(col, -0.25));
+  circle(0.6, -27, 5.6, skin); ctx.save(); ctx.beginPath(); ctx.arc(0.6, -27, 5.6, 0, 6.283); ctx.clip(); ctx.fillStyle = sk2; ctx.fillRect(2.4, -33, 6, 12); ctx.restore();
+  ctx.fillStyle = '#1c1c1c'; ctx.fillRect(1.8, -28.4, 1.3, 1.4); ctx.fillRect(4.2, -28.4, 1.2, 1.4);
+  poly([[1.4, -24], [2.4, -21.6], [3, -24]], '#fff8e0'); poly([[4.2, -24], [5, -21.8], [5.6, -24]], '#fff8e0');
+  poly([[7, -12], [10, -13], [16, -32], [11.6, -33.6]], '#7a5634'); for (const [sx, sy] of [[12.6, -30], [14.6, -27], [13.6, -23]]) circle(sx, sy, 1, '#d9d2c4');
+  circle(8.6, -13, 2.4, skin);
+}
+function fanMount(col, tribe, unicorn) { // a horse in heraldic cloth, or a unicorn
+  paintHorse(unicorn ? '#f4f1ea' : '#7a4d2a', null, false);
+  poly([[-9.6, -15.4], [6.6, -15.8], [8.4, -5.2], [-11, -4.6]], col);
+  poly([[-11, -4.6], [8.4, -5.2], [8.2, -6.8], [-10.8, -6.2]], FAN.gold);
+  for (let k = 0; k < 4; k++) { const x = -9 + k * 5; poly([[x, -5], [x + 2.4, -2.4], [x + 4.8, -5]], col); }
+  emblem(tribe, -1.4, -10.4, 1, luma(col) > 0.8 ? '#5a4a2a' : '#fff4d0');
+  ellipse(11.8, -26.4, 1.6, 3, col, null, 0, -0.5); // a plume
+  if (unicorn) { poly([[14.6, -23.4], [19.6, -31], [16, -22.6]], FAN.gold); }
+}
+function fanBallista(col, tribe, arcane) {
+  poly([[-13, -8], [12, -8], [13, -4], [-12, -4]], FAN.wood, FAN.wood2, 0.8); poly([[-12, -4], [13, -4], [13, -2.6], [-12, -2.6]], '#6b4626');
+  for (const wx of [-8, 8]) { circle(wx, -1.5, 3.8, FAN.wood2); circle(wx, -1.5, 2.7, FAN.wood); circle(wx, -1.5, 1, FAN.gold); }
+  if (arcane) { // an arcane cannon: a crystal barrel humming with light
+    poly([[-6, -9], [2, -9], [3, -13], [-5, -13]], '#6b4626');
+    circle(10, -22, 7, 'rgba(190,150,255,.22)');
+    poly([[-4, -12], [12, -24], [14, -21], [-1, -9]], '#b998ff', '#6b3fb8', 0.8); poly([[12, -24], [17, -26], [15.4, -19.6], [14, -21]], '#e6d9ff');
+    for (const t of [0.3, 0.6]) circle(-4 + 16 * t, -12 - 12 * t + 1.4, 1.4, FAN.gold);
+  } else { // a ballista: a great crossbow on wheels
+    poly([[-4, -8], [4, -8], [2, -14], [-2, -14]], FAN.wood2);
+    ctx.strokeStyle = FAN.wood; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.moveTo(-8, -24); ctx.quadraticCurveTo(2, -16, 12, -8); ctx.stroke();
+    ctx.strokeStyle = '#f3ead6'; ctx.lineWidth = 0.7; line(-8, -24, -6, -12); line(-6, -12, 12, -8);
+    ctx.strokeStyle = FAN.wood2; ctx.lineWidth = 2; line(-6, -12, 14, -24); poly([[13, -26], [17.6, -26.6], [14.6, -22.4]], FAN.steel);
+  }
+  ctx.strokeStyle = '#4a2f1a'; ctx.lineWidth = 1; line(-12.5, -8, -12.5, -27);
+  poly([[-12.5, -27], [-4, -25.4], [-6, -23.6], [-4, -21.8], [-12.5, -22.6]], col);
+  emblem(tribe, -9.4, -24.4, 0.55, luma(col) > 0.8 ? '#5a4a2a' : '#fff4d0');
+}
+function fanShip(col, tribe, kind) {
+  if (kind === 'boat') { // a longship with a dragon prow, shields along the side and a striped sail
+    poly([[-18, -7], [18, -7], [13, 3], [-13, 3]], FAN.wood); poly([[-18, -7], [18, -7], [17, -5], [-17, -5]], '#a8763f');
+    poly([[17, -7], [22, -15], [24.6, -14], [22.6, -11.4], [20, -6]], FAN.wood2); circle(23, -13.6, 0.7, '#ffd34d');
+    poly([[-17, -7], [-21, -13], [-18.6, -12], [-16, -6]], FAN.wood2);
+    for (let k = -12; k <= 12; k += 6) circle(k, -4.6, 2.2, k % 12 === 0 ? col : '#f4f1ea', FAN.wood2, 0.6);
+    ctx.strokeStyle = FAN.wood2; ctx.lineWidth = 1.4; line(2, -7, 2, -36);
+    for (let k = 0; k < 4; k++) poly([[-8, -33 + k * 6], [12, -33.4 + k * 6], [12, -27.4 + k * 6], [-8, -27 + k * 6]], k % 2 ? '#f4f1ea' : col);
+  } else { // a galleon (two masts) or a war galleon (three masts and a stern castle)
+    const big = kind === 'battleship';
+    poly([[-25, -11], [23, -11], [18, 3], [-19, 3]], FAN.wood); poly([[-25, -11], [23, -11], [22, -8], [-24, -8]], '#a8763f');
+    poly([[1, -8], [22, -8], [18, 3], [1, 3]], 'rgba(0,0,0,.18)');
+    ctx.fillStyle = FAN.gold; ctx.fillRect(-22, -6, 42, 1);
+    if (big) { isoBox(-18, -11, 5, 7, '#a8763f', FAN.wood, '#c89058', 0); for (let k = -12; k <= 16; k += 7) circle(k, -3, 1, '#2a201a'); }
+    const masts = big ? [-8, 4, 15] : [-5, 9];
+    for (const [i, mx] of masts.entries()) {
+      const h = i === 1 || !big ? 42 : 34;
+      ctx.strokeStyle = FAN.wood2; ctx.lineWidth = 1.5; line(mx, -11, mx, -11 - h);
+      ctx.beginPath(); ctx.moveTo(mx - 7, -h - 6); ctx.quadraticCurveTo(mx + 2, -h + 4, mx - 7, -22); ctx.lineTo(mx + 7, -22); ctx.quadraticCurveTo(mx + 11, -h + 4, mx + 7, -h - 6); ctx.closePath();
+      ctx.fillStyle = '#f7f1df'; ctx.fill(); ctx.fillStyle = col; ctx.fillRect(mx - 7, -h + 2, 14, 3);
+      poly([[mx, -11 - h], [mx + 7, -9.6 - h], [mx, -8 - h]], col);
+    }
+    emblem(tribe, masts[masts.length - 1], -28, 0.9, luma(col) > 0.8 ? '#5a4a2a' : col);
+  }
+  ellipse(-16, 1.5, 3, 1, 'rgba(255,255,255,.55)'); ellipse(16, 1.5, 3, 1, 'rgba(255,255,255,.55)');
+}
+function fanUnit(type, tribe, medium) {
+  const col = TRIBES[tribe].color, skin = SKIN[tribe], role = UNIT_ROLE[type];
+  if (medium !== 'land') {
+    fanShip(col, tribe, medium);
+    ctx.save(); ctx.translate(-5, -7); ctx.scale(0.85, 0.85); fanHero(BOAT_RIDER[type] || 'trooper', col, skin, tribe, { noLegs: true }); ctx.restore();
+    return true;
+  }
+  switch (role) {
+    case 'mount': case 'heavymount': case 'rangedmount': case 'supermount': {
+      const big = role === 'supermount';
+      ctx.save(); if (big) ctx.scale(1.3, 1.3);
+      fanMount(col, tribe, role === 'heavymount' || big);
+      ctx.translate(-1.2, -9.5);
+      if (role === 'rangedmount') fanHero('ranged', col, skin, tribe, { noLegs: true });
+      else { fanBody(col, skin, tribe, role === 'mount' ? 'horns' : 'plume', { noLegs: true, armour: role !== 'mount' });
+        ctx.strokeStyle = '#c8a46a'; ctx.lineWidth = 2; line(-4, -11, 27, -24.5); poly([[26, -26.4], [31, -25.6], [27.6, -22.6]], FAN.steel); poly([[18, -22], [24, -20.5], [18.6, -18]], col);
+        fanArm(6.3, 7.3, -13.5, col, skin); }
+      ctx.restore();
+      if (big) { ctx.strokeStyle = '#ffe27a'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(-14, -52); ctx.lineTo(-10, -45); ctx.lineTo(-13, -44); ctx.lineTo(-8, -36); ctx.stroke(); }
+      return true;
+    }
+    case 'siege': fanBallista(col, tribe, false); return true;
+    case 'bigsiege': fanBallista(col, tribe, true); return true;
+    case 'colossus': if (type !== 'giant') return false; ctx.save(); ctx.scale(1.5, 1.5); fanOgre(col); ctx.restore(); return true;
+    case 'trooper': case 'blade': case 'guard': case 'ranged': case 'mystic': case 'champion': case 'harpoon':
+      ctx.save(); if (role === 'champion') ctx.scale(1.12, 1.12); fanHero(role, col, skin, tribe); ctx.restore(); return true;
+    default: return false;
+  }
+}
+
+/* Nostalgic: hand-placed pixel art. Each letter is one big pixel: k outline, c tribe colour, d dark, l light, s skin,
+   m/M stone or steel, w white, y gold, b/B wood, e glass, o magic, h/H the mount's coat */
+const PIX = {
+  soldier: ['.....kkkk.....', '....kmmmmk....', '....kmMMmk..k.', '....kssssk.kwk', '....kskssk.kwk', '....kssssk.kwk', '...kkkcckkkkwk', '..kcccccccykk.',
+    '.kmmkcccckssk.', 'kmMmmkcdckkk..', 'kmMmmkyyyk....', '.kmmkccdck....', '..kkkdkkdk....', '....kdk.kdk...', '...kBBk.kBBk..'],
+  archer: ['.....kkkk.....', '....kddddk....', '...kddssdk.kk.', '...kdssksk.wbk', '...kdsssskkw.b', '....kkcckk.w.b', '...kccccckssyb', '..kcccccck.w.b',
+    '..kcccccck.w.b', '..kkyyyyk..wkb', '...kccdck..kb.', '...kdkkdk..b..', '...kdk.kdk....', '..kBBk.kBBk...'],
+  mage: ['.....k......kk', '....kck....kok', '....kcck...kok', '...kclcck...k.', '..kccccccck.B.', '.kkkkkkkkkkkB.', '...kssssk...B.', '...kskssk...B.',
+    '...kwwwwk..sB.', '..kcwwwwcksBk.', '..kcccccck.B..', '.kccccccck.B..', '.kcccyccck.B..', 'kccccccccck.B.', 'kkkkkkkkkkk...'],
+  guard: ['..k..kkkk.....', '.kmk.kmmmk....', '.kmkkmmmmmk...', '..b.kssssk....', '..b.kskssk....', '..b.kssssk....', '..bkkkcckkk...', '..skcccckmmmmk',
+    '..bkcccckmcmmk', '..bkcdcckmccmk', '..bkyyyykmmmmk', '..bkccdck.kmk.', '..bkdkkdk..k..', '..bkdk.kdk....', '.kBBk.kBBk....'],
+  rider: ['.......kkk..........', '......kmmmk......kk.', '......kssk......kwk.', '.....kccck.....kb...', '.....kcccsk...kb....', '.....kccckkkkkb.....',
+    '...kkkkcckkkkk..kk..', '..khhhcccchhhhkkhhk.', '.khhhhhhhhhhhhhhhhk.', 'kHkhhhhhhhhhhhhk.kk.', 'kH.khhhhhhhhhhk.....', '...khk.khk.khk.khk..',
+    '...kHk.kHk.kHk.kHk..', '...kkk.kkk.kkk.kkk..'],
+  catapult: ['..............kk..', '.............kmmk.', '............kkmmk.', '...........kBkkk..', '..........kBk.....', '...k.....kBk......', '..kck...kBk.......',
+    '..kcck.kBk........', '..kk.kkBk.........', 'kkkkkkkkkkkkkkkk..', 'kbbbbbbbbbbbbbbk..', 'kkBBkkkkkkkBBkkk..', '.kBBk.....kBBk....', '..kk.......kk.....'],
+  robot: ['....kkkkkk....', '....kmmmmk....', '....kmeemk....', '....kmmmmk....', '.kkkkkkkkkkkk.', '.kmmmmccmmmmk.', '.kmMmmccmmMmk.', '.kmmmmmmmmmmk.',
+    'kMk.kmmmmk.kMk', 'kMk.kccccc.kMk', 'kkk.kmmmmk.kkk', '....kmkkmk....', '....kmk.kmk...', '...kMMk.kMMk..', '...kkkk.kkkk..'],
+  house: ['....kk....', '...kcck...', '..kccdck..', '.kccccddk.', 'kkkkkkkkkk', '.kwwwwwwk.', '.kwewwbbk.', '.kwwwwbbk.', '.kkkkkkkk.'],
+  tower: ['...kk...', '..kcck..', '..kcck..', '.kccddk.', 'kkkkkkkk', '.kmmmMk.', '.kmkkMk.', '.kmmmMk.', '.kmmmMk.', '.kmkkMk.', '.kmmmMk.', '.kmmmMk.', '.kkkkkk.'],
+  castle: ['..k............k..', '..kcc..........kcc', '..k............k..', '.kkk..........kkk.', '.kmk.kk.kk.kk.kmk.', '.kmkkmmkmmkmmkkmk.', '.kmmmmmmmmmmmmmmk.',
+    '.kmMmmmmccmmmmMmk.', '.kmMmkkmccmkkmMmk.', '.kmmmkkmmmmkkmmmk.', '.kmmmmmmmmmmmmmmk.', '.kmMmmmkkkkmmmMmk.', '.kmMmmkBBBBkmmMmk.', '.kmmmmkBBBBkmmmmk.', '.kkkkkkkkkkkkkkkk.'],
+  wall: ['k.k.', 'kkkk', 'kmMk', 'kkkk'],
+};
+function pixShip(masts, len) { // hull, masts and square sails, built row by row
+  const W = len, rows = [], top = 11, sw = masts > 1 ? 3 : 4; // sails: rows 2..8, sw pixels wide either side of the mast
+  for (let r = 0; r < top; r++) {
+    const row = '.'.repeat(W).split('');
+    for (let m = 0; m < masts; m++) {
+      const mx = Math.round(W * (masts > 1 ? (m + 1.6) / (masts + 1.2) : 0.68));
+      if (r === 0) { row[mx] = 'k'; row[mx + 1] = 'c'; row[mx + 2] = 'c'; }
+      else if (r >= 2 && r <= 8) for (let dx = -sw; dx <= sw; dx++) { const edge = r === 2 || r === 8 || Math.abs(dx) === sw; row[mx + dx] = edge ? 'k' : r === 5 ? 'c' : 'w'; }
+      else row[mx] = 'k';
+    }
+    rows.push(row.join(''));
+  }
+  rows.push('k'.repeat(W));
+  rows.push('k' + 'b'.repeat(W - 2) + 'k');
+  rows.push('.k' + (masts > 2 ? 'BkBBBkBBBkBBBkBBBkBBBk'.slice(0, W - 4) : 'B'.repeat(W - 4)) + 'k.');
+  rows.push('..' + 'k'.repeat(W - 4) + '..');
+  return rows;
+}
+function pixPal(col, skin, coat) {
+  return { k: '#000000', c: col, d: shade(col, -0.38), l: shade(col, 0.35), s: skin || '#f8b878', m: '#bcbcbc', M: '#7c7c7c', w: '#fcfcfc', y: '#f8d800',
+    b: '#a85820', B: '#503000', o: '#b878f8', e: '#3cbcfc', h: coat || '#a85820', H: shade(coat || '#a85820', -0.45) };
+}
+function pixDraw(rows, pal, p = 2.3, ox = 0, oy = 0) { // anchored at the bottom middle
+  const w = Math.max(...rows.map(r => r.length)), x0 = ox - w * p / 2, y0 = oy - rows.length * p;
+  rows.forEach((row, r) => { for (let c = 0; c < row.length; c++) { const col = pal[row[c]]; if (!col) continue; ctx.fillStyle = col; ctx.fillRect(x0 + c * p, y0 + r * p, p + 0.06, p + 0.06); } });
+}
+function pixUnit(type, tribe, medium) {
+  const col = TRIBES[tribe].color, role = UNIT_ROLE[type], pal = pixPal(col, SKIN[tribe]);
+  if (medium !== 'land') {
+    const ship = medium === 'boat' ? pixShip(1, 18) : medium === 'ship' ? pixShip(2, 24) : pixShip(3, 30);
+    pixDraw(ship, pal, 1.8, 0, 3);
+    pixDraw(PIX.soldier.slice(0, 9), pal, 1.5, medium === 'boat' ? -9 : medium === 'ship' ? -13 : -16, -5.4);
+    return true;
+  }
+  const steel = { ...pal, m: '#f8d800', M: '#c88800' }; // gold armour for champions
+  switch (role) {
+    case 'trooper': case 'blade': case 'harpoon': pixDraw(PIX.soldier, pal, 2.3); return true;
+    case 'android': pixDraw(PIX.robot, { ...pal, e: col }, 2.2); return true;
+    case 'champion': pixDraw(PIX.soldier, steel, 2.6); return true;
+    case 'guard': pixDraw(PIX.guard, pal, 2.3); return true;
+    case 'ranged': pixDraw(PIX.archer, pal, 2.3); return true;
+    case 'mystic': pixDraw(PIX.mage, pal, 2.3); return true;
+    case 'mount': case 'rangedmount': pixDraw(PIX.rider, pixPal(col, SKIN[tribe], '#a85820'), 2); return true;
+    case 'heavymount': pixDraw(PIX.rider, pixPal(col, SKIN[tribe], '#e4e4e4'), 2); return true;
+    case 'supermount': pixDraw(PIX.rider, pixPal(col, SKIN[tribe], '#fcfcfc'), 2.6); return true;
+    case 'siege': case 'bigsiege': pixDraw(PIX.catapult, pal, role === 'bigsiege' ? 2.4 : 2); return true;
+    case 'colossus': pixDraw(PIX.soldier, pal, 3.5); return true;
+    case 'mech': case 'tank': pixDraw(PIX.robot, { ...pal, e: '#f83800' }, 3.2); return true;
+    default: return false;
+  }
+}
+
+/* cities in each style */
+function themedCity(tribe, level, capital, wall, tier) {
+  if (theme === 'scifi') { sciCity(tribe, level, capital, wall, tier); return true; }
+  if (theme === 'fantasy') { fanCity(tribe, level, capital, wall, tier); return true; }
+  if (theme === 'nostalgic') { pixCity(tribe, level, capital, wall, tier); return true; }
+  return false;
+}
+function cityItems(level, capital) {
+  const items = [];
+  for (let i = 0; i < Math.min(6, level + 1); i++) items.push({ x: CITY_SLOTS[i][0], y: CITY_SLOTS[i][1], i, hall: capital && i === 0 });
+  return items.sort((a, b) => a.y - b.y || a.x - b.x);
+}
+const WALL_EDGES = front => { const i = 3, top = [0, -16 + i], right = [32 - 2 * i, 0], bot = [0, 16 - i], left = [-32 + 2 * i, 0]; return front ? [[right, bot], [bot, left]] : [[left, top], [top, right]]; };
+// Sci-fi: glass towers with glowing bands and domes on a platform, behind an energy fence
+function sciTower(x, y, r, h, col, k) {
+  cylinder(x, y, r, h, '#d9e0ea', '#9aa4b8');
+  for (let b = 1; b * 4 < h - 2; b++) { ctx.strokeStyle = b % 2 ? shade(col, 0.25) : 'rgba(98,244,255,.95)'; ctx.lineWidth = 0.9; ctx.beginPath(); ctx.ellipse(x, y - b * 4, r, r / 2, 0, 0, Math.PI); ctx.stroke(); }
+  if (k % 2) dome(x, y - h, r, 'rgba(98,244,255,.85)', 'rgba(40,140,190,.85)', 0.8);
+  else { ellipse(x, y - h, r, r / 2, '#eef2f7'); ctx.strokeStyle = '#5c6680'; ctx.lineWidth = 0.8; line(x, y - h, x, y - h - 6); circle(x, y - h - 6, 1, '#ff5ce8'); }
+}
+function sciEnergyFence(front) {
+  for (const [a, b] of WALL_EDGES(front)) {
+    poly([a, b, [b[0], b[1] - 7], [a[0], a[1] - 7]], 'rgba(98,244,255,.2)');
+    ctx.strokeStyle = 'rgba(160,250,255,.85)'; ctx.lineWidth = 0.8; line(a[0], a[1] - 7, b[0], b[1] - 7); line(a[0], a[1] - 3.5, b[0], b[1] - 3.5);
+    for (let k = 0; k <= 4; k++) { const t = k / 4, px = a[0] + (b[0] - a[0]) * t, py = a[1] + (b[1] - a[1]) * t; poly([[px - 0.9, py], [px - 0.9, py - 8], [px + 0.9, py - 8], [px + 0.9, py]], '#3a4155'); circle(px, py - 8.4, 0.9, SCI.glow); }
+  }
+}
+function sciCity(tribe, level, capital, wall, tier) {
+  const col = TRIBES[tribe].color;
+  ellipse(0, 1.5, 30, 14, '#232a40'); ellipse(0, 0, 28, 12.6, '#3c4766');
+  ctx.strokeStyle = shade(col, 0.2); ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(0, 0, 24, 10.6, 0, 0, 6.283); ctx.stroke();
+  ctx.strokeStyle = 'rgba(98,244,255,.5)'; ctx.beginPath(); ctx.ellipse(0, 0, 27, 12, 0, 0, 6.283); ctx.stroke();
+  if (wall) sciEnergyFence(false);
+  if (tier >= 3) { const g = ctx.createLinearGradient(0, -8, 0, -78); g.addColorStop(0, 'rgba(98,244,255,.55)'); g.addColorStop(1, 'rgba(98,244,255,0)'); poly([[-2.6, -8], [2.6, -8], [1.2, -78], [-1.2, -78]], g); }
+  if (tier >= 2) for (const [tx, ty] of [[-21, -6], [21, -6]]) { // skyscrapers behind
+    const h = 30 + tier * 4;
+    isoBox(tx, ty, 4.4, h, '#c9d1dd', '#8b95aa', '#e6ebf2', 0);
+    for (let wy = 4; wy < h - 2; wy += 3.4) { ctx.fillStyle = (wy | 0) % 2 ? shade(col, 0.3) : 'rgba(98,244,255,.9)'; ctx.fillRect(tx - 3.6, ty - wy, 2.6, 1); ctx.fillRect(tx + 1, ty - wy + 1, 2.6, 1); }
+  }
+  for (const it of cityItems(level, capital)) {
+    const lv = Math.min(level, 6);
+    if (it.hall) { // the capital's spire, ringed and crowned with light
+      const h = 30 + lv * 2.4;
+      cylinder(it.x, it.y, 4.8, h, '#e6ebf2', '#a6b0c3');
+      for (let b = 1; b * 5 < h - 3; b++) { ctx.strokeStyle = 'rgba(98,244,255,.9)'; ctx.lineWidth = 0.9; ctx.beginPath(); ctx.ellipse(it.x, it.y - b * 5, 4.8, 2.4, 0, 0, Math.PI); ctx.stroke(); }
+      ctx.strokeStyle = col; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.ellipse(it.x, it.y - h * 0.7, 9, 3.2, 0, 0, 6.283); ctx.stroke();
+      cone(it.x, it.y - h, 4.8, 8, '#eef2f7', '#b8c0cf'); circle(it.x, it.y - h - 9, 2.4, 'rgba(98,244,255,.5)'); circle(it.x, it.y - h - 9, 1.3, '#ffffff');
+    } else if (it.i % 3 === 1) { // a glass dome house
+      cylinder(it.x, it.y, 5.4, 3, '#cfd6e2', '#8f99ad');
+      dome(it.x, it.y - 3, 5.4, 'rgba(98,244,255,.8)', 'rgba(40,140,190,.8)', 0.9);
+      ctx.fillStyle = col; ctx.fillRect(it.x - 1.2, it.y - 2.6, 2.4, 2.6);
+    } else sciTower(it.x, it.y, 3.6, 11 + lv * 1.6 + (it.i % 2) * 5, col, it.i);
+  }
+  if (tier >= 1) for (const [bx, by] of [[-18, 4], [18, 4], [0, 13]]) { // holographic banners
+    ctx.strokeStyle = '#5c6680'; ctx.lineWidth = 0.9; line(bx, by, bx, by - 13);
+    poly([[bx + 0.6, by - 13], [bx + 5.6, by - 13], [bx + 5.6, by - 6], [bx + 0.6, by - 6]], `${col}aa`); ctx.strokeStyle = 'rgba(160,250,255,.8)'; ctx.lineWidth = 0.5; ctx.strokeRect(bx + 0.6, by - 13, 5, 7);
+  }
+  if (tier >= 4) { ctx.strokeStyle = 'rgba(160,250,255,.9)'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.ellipse(0, -66, 16, 4, -0.15, 0, 6.283); ctx.stroke(); circle(14, -68, 1.6, '#ff5ce8'); }
+  if (wall) sciEnergyFence(true);
+}
+// Fantasy: a castle keep, round towers with pennants and timbered cottages
+function fanTower(x, y, r, h, col, roof) {
+  cylinder(x, y, r, h, '#e6dcc8', '#b9ae98');
+  ctx.strokeStyle = 'rgba(90,70,40,.35)'; ctx.lineWidth = 0.5; for (let b = 3; b < h; b += 3.4) { ctx.beginPath(); ctx.ellipse(x, y - b, r, r / 2, 0, 0.2, Math.PI - 0.2); ctx.stroke(); }
+  ctx.fillStyle = '#3a2a1a'; ctx.fillRect(x - 0.8, y - h * 0.6, 1.6, 2.6);
+  cone(x, y - h, r + 1.5, r * 2.4 + 2, roof || col, shade(roof || col, -0.25));
+  const tip = y - h - r * 2.4 - 2;
+  ctx.strokeStyle = '#4a3a2e'; ctx.lineWidth = 0.7; line(x, tip, x, tip - 5); poly([[x, tip - 5], [x + 4.4, tip - 4], [x, tip - 3]], roof === '#8a5ae0' ? '#ffe27a' : col);
+}
+function fanCottage(x, y, col) {
+  gableBox(x, y, 5.4, 5.4, '#f4e8cf', '#dccaa6', col, shade(col, -0.25), 4.8);
+  ctx.strokeStyle = '#6b4a2b'; ctx.lineWidth = 0.7; line(x - 5.4, y - 2.7, x, y); line(x - 3, y - 5.4, x - 3, y - 1.4); line(x + 2.6, y + 1.4, x + 2.6, y - 3.6);
+  ctx.fillStyle = '#ffd877'; ctx.fillRect(x - 3.8, y - 3.6, 1.4, 1.4);
+  isoBox(x + 3, y - 7, 1, 4, '#9a8a78', '#7a6a58', '#b0a08e', 0);
+}
+function fanCity(tribe, level, capital, wall, tier) {
+  const col = TRIBES[tribe].color;
+  ellipse(0, 0.5, 26, 11.5, '#cbb994'); ellipse(0, 0, 23, 10, '#dccba6');
+  for (let k = 0; k < 9; k++) ellipse(-14 + (k % 3) * 14 + (k > 2 ? 4 : 0), -4 + Math.floor(k / 3) * 4, 2.2, 1, 'rgba(120,96,60,.3)');
+  if (wall) cityWalls(1, false);
+  if (tier >= 2) for (const [tx, ty] of [[-21, -6], [21, -6]]) fanTower(tx, ty, 3.6, 22 + tier * 3, col);
+  if (tier >= 3) { // a wizard's tower and a floating crystal
+    fanTower(9, -12, 2.8, 34 + tier * 3, col, '#8a5ae0');
+    const cy = -62 - tier * 4;
+    circle(0, cy, 8, 'rgba(190,150,255,.25)'); poly([[0, cy - 7], [4, cy], [0, cy + 7], [-4, cy]], '#d9c6ff', '#8a5ae0', 0.8); poly([[0, cy - 7], [4, cy], [0, cy + 7]], '#b79cf0');
+  }
+  for (const it of cityItems(level, capital)) {
+    const lv = Math.min(level, 6);
+    if (it.hall) { // the keep, with a turret at each side
+      const h = 15 + lv * 1.3;
+      isoBox(it.x, it.y, 8, h, '#e6dcc8', '#b9ae98', '#efe7d6', 0);
+      for (let k = -2; k <= 2; k++) isoBox(it.x + k * 3.4, it.y - h - 0.6 + Math.abs(k) * 1.7 - 2, 1.1, 2, '#e6dcc8', '#b9ae98', '#efe7d6', 0);
+      ctx.fillStyle = '#3a2a1a'; ctx.beginPath(); ctx.ellipse(it.x - 3, it.y + 0.6, 1.8, 3.4, 0, Math.PI, 0); ctx.fill();
+      poly([[it.x + 2, it.y - h + 4], [it.x + 6, it.y - h + 2], [it.x + 6, it.y - h + 9], [it.x + 2, it.y - h + 11]], col);
+      for (const s of [-1, 1]) fanTower(it.x + s * 9, it.y + 1, 2.8, h + 4, col);
+    } else if (it.i % 2) fanTower(it.x, it.y, 3.2, 10 + lv * 1.3, col);
+    else fanCottage(it.x, it.y, col);
+  }
+  if (tier >= 1) for (const [bx, by] of [[-18, 4], [18, 4], [0, 13]]) { ctx.strokeStyle = '#4a3a2e'; ctx.lineWidth = 0.9; line(bx, by, bx, by - 13); poly([[bx, by - 13], [bx + 5, by - 13], [bx + 5, by - 8], [bx + 2.5, by - 9.6], [bx, by - 8]], col); }
+  if (wall) cityWalls(1, true);
+}
+function fanHallFlag(level) { const [sx, sy] = CITY_SLOTS[0], lv = Math.min(level, 6), h = 15 + lv * 1.3; return [sx - 9, sy + 1 - (h + 4) - 2.8 * 2.4 - 2 - 5]; }
+// Nostalgic: pixel castles, towers and houses
+function pixCity(tribe, level, capital, wall, tier) {
+  const col = TRIBES[tribe].color, pal = pixPal(col), gold = { ...pal, m: '#f8d800', M: '#c88800' };
+  poly([[0, -12], [26, 0], [0, 12], [-26, 0]], '#bcbcbc', '#000', 1);
+  const blocks = front => { for (const [a, b] of WALL_EDGES(front)) for (let k = 0; k <= 5; k++) { const t = k / 5; pixDraw(PIX.wall, pal, 1.8, a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t + 1); } };
+  if (wall) blocks(false);
+  if (tier >= 2) for (const tx of [-21, 21]) pixDraw(PIX.tower, tier >= 3 ? gold : pal, 2 + tier * 0.15, tx, -5);
+  for (const it of cityItems(level, capital)) {
+    if (it.hall) pixDraw(PIX.castle, pal, 1.9 + Math.min(level, 6) * 0.06, it.x, it.y + 2);
+    else if (it.i % 3 === 2 && level >= 3) pixDraw(PIX.tower, pal, 1.7, it.x, it.y + 1);
+    else pixDraw(PIX.house, pal, 1.9, it.x, it.y + 1);
+  }
+  if (tier >= 4) pixDraw(['..kk..', '.kyyk.', 'kyywyk', 'kyyyyk', '.kyyk.', '..kk..'], pal, 2.4, 0, -64);
+  if (wall) blocks(true);
+}
+
 function paintUnit(type, tribe, medium) {
+  const themed = { scifi: sciUnit, fantasy: fanUnit, nostalgic: pixUnit }[theme];
+  if (themed && themed(type, tribe, medium)) return; // each style has its own troops
   const col = TRIBES[tribe].color, skin = SKIN[tribe];
   if (medium !== 'land') {
     paintBoat(col, tribe, medium === 'boat' ? false : medium);
@@ -4188,7 +4786,7 @@ function drawBuildingAt(tl, x, y, cx, cy, now, dim) {
     gr.addColorStop(0, 'rgba(80,220,255,0)'); gr.addColorStop(0.82, `rgba(80,220,255,${a * 0.6})`); gr.addColorStop(0.97, `rgba(170,250,255,${a * 1.6})`); gr.addColorStop(1, 'rgba(170,250,255,0)');
     ctx.fillStyle = gr; ctx.beginPath(); ctx.ellipse(cx, cy - 2, r, r * 0.95, 0, Math.PI, 0); ctx.ellipse(cx, cy - 2, r, r * 0.42, 0, 0, Math.PI); ctx.fill();
   }
-  if (b.capital && !dim) { const [fx, fy] = hallFlag(tribe, lv); waveFlag(cx + fx, cy + fy, pl.color, now, tribe); }
+  if (b.capital && !dim && (theme === 'standard' || theme === 'fantasy')) { const [fx, fy] = theme === 'fantasy' ? fanHallFlag(lv) : hallFlag(tribe, lv); waveFlag(cx + fx, cy + fy, pl.color, now, tribe); }
   labels.push({ x: cx, y: cy + 15, text: b.name, capital: b.capital, level: b.level, color: pl.color, pop: b.pop, need: popNeeded(b), ally: b.owner !== G.view && allied(b.owner, G.view) });
 }
 const unitMedium = u => (isWater(T(u.x, u.y)) && !swims(u) ? ['boat', 'ship', 'battleship'][u.boat || 0] : 'land');
