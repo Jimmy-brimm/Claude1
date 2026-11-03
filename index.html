@@ -4,12 +4,97 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>Polyweb</title>
+<meta name="description" content="Build a tribe into an empire: a low-poly strategy game for the browser that also plays offline.">
+<meta name="theme-color" content="#0d3247">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Polyweb">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<script>try { document.documentElement.dataset.theme = localStorage.getItem('polyweb-theme') || 'standard'; } catch (e) { /* the loading screen falls back to the standard look */ }</script>
+<style>
+/* The loading screen: painted straight from here, before the stylesheet, the fonts and the game script arrive */
+#splash{--b1:#0d3247;--b2:#04131d;--ac:#ff7457;--ac2:#ffc94a;--tx:#f2fbff;--mu:#9fc6d8;--fn:"Fredoka","Arial Rounded MT Bold","Trebuchet MS",system-ui,sans-serif;
+  position:fixed;inset:0;z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px;
+  background:radial-gradient(ellipse at 50% 42%,var(--b1),var(--b2) 75%);color:var(--tx);font:600 15px/1.4 var(--fn);text-align:center;
+  transition:opacity .55s ease,visibility .55s;-webkit-user-select:none;user-select:none}
+html[data-theme="scifi"] #splash{--b1:#0e1a52;--b2:#01020a;--ac:#36f0ff;--ac2:#ff5ce8;--tx:#e6fbff;--mu:#8db3d6;--fn:"Orbitron","Eurostile",system-ui,sans-serif}
+html[data-theme="fantasy"] #splash{--b1:#4a3118;--b2:#120902;--ac:#f2c75c;--ac2:#c9a24a;--tx:#f8ead0;--mu:#d2b88c;--fn:"Cinzel",Georgia,serif}
+html[data-theme="nostalgic"] #splash{--b1:#10108a;--b2:#000;--ac:#fcd800;--ac2:#f83800;--tx:#fff;--mu:#bcbcbc;--fn:"Press Start 2P","Courier New",monospace}
+#splash.done{opacity:0;visibility:hidden;pointer-events:none}
+#splash svg{width:min(240px,62vw);height:auto;overflow:visible}
+#splash .sp-logo{font:700 clamp(40px,11vw,64px)/1 var(--fn);letter-spacing:1px;margin-top:4px;text-shadow:0 4px 0 var(--ac),0 10px 24px rgba(0,0,0,.45)}
+html[data-theme="nostalgic"] #splash .sp-logo{font-size:clamp(24px,7vw,40px);text-shadow:4px 4px 0 var(--ac2),8px 8px 0 #000;color:var(--ac)}
+#splash .sp-bar{width:min(280px,72vw);height:12px;border-radius:999px;background:rgba(255,255,255,.12);overflow:hidden;margin-top:14px;box-shadow:inset 0 2px 4px rgba(0,0,0,.35)}
+#splash .sp-fill{height:100%;width:var(--p,4%);border-radius:inherit;background:linear-gradient(90deg,var(--ac),var(--ac2));transition:width .35s ease}
+html[data-theme="nostalgic"] #splash .sp-bar,html[data-theme="nostalgic"] #splash .sp-fill{border-radius:0}
+html[data-theme="nostalgic"] #splash .sp-bar{border:3px solid #fff;height:16px}
+html[data-theme="scifi"] #splash .sp-bar{border-radius:0;border:1px solid rgba(54,240,255,.6)}
+html[data-theme="scifi"] #splash .sp-fill{border-radius:0;box-shadow:0 0 12px var(--ac)}
+#splash .sp-msg{color:var(--mu);font-size:13px;min-height:1.4em}
+html[data-theme="nostalgic"] #splash .sp-msg{font-size:10px}
+#splash .sp-err{display:none;max-width:320px}
+#splash.failed .sp-err{display:block}
+#splash.failed .sp-bar,#splash.failed #splash-msg{display:none}
+#splash .sp-err button{margin-top:10px;font:inherit;color:#fff;background:var(--ac);border:0;border-radius:12px;padding:10px 18px;cursor:pointer}
+#splash .tile{animation:sp-rise .7s cubic-bezier(.2,1.4,.4,1) backwards}
+#splash .t2{animation-delay:.12s}#splash .t3{animation-delay:.24s}#splash .t4{animation-delay:.36s}#splash .thing{animation:sp-pop .5s cubic-bezier(.2,1.6,.4,1) .6s backwards}
+#splash .island{animation:sp-bob 3.2s ease-in-out 1.2s infinite}
+#splash .flag{transform-origin:118px 22px;animation:sp-wave 1s ease-in-out infinite alternate}
+#splash .ripple{transform-origin:100px 104px;animation:sp-ripple 2.6s ease-out infinite}
+#splash .ripple.r2{animation-delay:1.3s}
+@keyframes sp-rise{from{transform:translateY(-34px);opacity:0}}
+@keyframes sp-pop{from{transform:scale(.2) translateY(20px);opacity:0}}
+@keyframes sp-bob{50%{transform:translateY(-4px)}}
+@keyframes sp-wave{to{transform:skewY(-12deg) scaleX(.85)}}
+@keyframes sp-ripple{from{transform:scale(.7);opacity:.7}to{transform:scale(1.25);opacity:0}}
+@media (prefers-reduced-motion:reduce){#splash *{animation:none!important}}
+</style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;800&family=Orbitron:wght@500;700;900&family=Exo+2:wght@400;600;800&family=Cinzel:wght@600;700;900&family=Alegreya:wght@400;600;800&family=Press+Start+2P&family=Pixelify+Sans:wght@400;600;700&display=swap">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<div id="splash" role="status" aria-live="polite">
+  <svg viewBox="0 0 200 150" aria-hidden="true">
+    <ellipse class="ripple" cx="100" cy="104" rx="86" ry="30" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="2"/>
+    <ellipse class="ripple r2" cx="100" cy="104" rx="86" ry="30" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="2"/>
+    <ellipse cx="100" cy="102" rx="78" ry="28" fill="#3d96d7"/><ellipse cx="100" cy="99" rx="62" ry="21" fill="#5ccde0"/>
+    <g class="island">
+      <g class="tile"><path d="M100 34l32 16-32 16-32-16z" fill="#7fd35e"/><path d="M68 50l32 16v10L68 60z" fill="#a8774a"/><path d="M100 66l32-16v10l-32 16z" fill="#8a5e38"/></g>
+      <g class="tile t2"><path d="M68 50l32 16-32 16-32-16z" fill="#6cc24e"/><path d="M36 66l32 16v10L36 76z" fill="#a8774a"/><path d="M68 82l32-16v10L68 92z" fill="#8a5e38"/></g>
+      <g class="tile t3"><path d="M132 50l32 16-32 16-32-16z" fill="#76cb56"/><path d="M100 66l32 16v10l-32-16z" fill="#a8774a"/><path d="M132 82l32-16v10l-32 16z" fill="#8a5e38"/></g>
+      <g class="tile t4"><path d="M100 66l32 16-32 16-32-16z" fill="#84d964"/><path d="M68 82l32 16v10L68 92z" fill="#a8774a"/><path d="M100 98l32-16v10l-32 16z" fill="#8a5e38"/></g>
+      <g class="thing"><path d="M58 70l9-22 9 22z" fill="#3f9a45"/><path d="M67 48l9 22h-9z" fill="#2f7d38"/><path d="M62 58l5-14 5 14z" fill="#4fb055"/></g>
+      <g class="thing"><path d="M120 72l14-28 14 28z" fill="#9aa3b2"/><path d="M134 44l14 28h-14z" fill="#7b8494"/><path d="M129 52l5-8 5 8-5 3z" fill="#fff"/></g>
+      <g class="thing"><path d="M90 52v-14h20v14l-10 5z" fill="#f2ead8"/><path d="M100 57V38h10v14z" fill="#d8ccb2"/><path d="M87 39l13-9 13 9z" fill="var(--ac)"/><path d="M100 30l13 9h-13z" fill="rgba(0,0,0,.18)"/>
+        <path d="M117 38V18" stroke="#3c3c3c" stroke-width="1.6"/><path class="flag" d="M118 19h12l-3 4 3 4h-12z" fill="var(--ac2)"/></g>
+      <g class="thing"><path d="M98 92c0-4 6-4 6 0v4h-6z" fill="#e8403a"/><circle cx="96" cy="86" r="3" fill="#ffd34d"/></g>
+    </g>
+  </svg>
+  <div class="sp-logo">Polyweb</div>
+  <div class="sp-bar"><div class="sp-fill" id="splash-fill"></div></div>
+  <div class="sp-msg" id="splash-msg">Raising the land…</div>
+  <div class="sp-err"><p>The game couldn't finish loading.</p><p class="sp-msg" id="splash-why"></p><button type="button" onclick="location.reload()">Try again</button></div>
+</div>
+<script>
+// Loading progress: the page and the game call splash(step) as they get ready; splash(1) hides the screen.
+window.splashT0 = performance.now();
+window.splash = (p, msg) => {
+  const el = document.getElementById('splash');
+  if (!el || el.classList.contains('done')) return;
+  document.getElementById('splash-fill').style.setProperty('--p', Math.round(p * 100) + '%');
+  if (msg) document.getElementById('splash-msg').textContent = msg;
+  if (p >= 1) setTimeout(() => { el.classList.add('done'); setTimeout(() => el.remove(), 700); }, Math.max(250, 1100 - (performance.now() - window.splashT0)));
+};
+window.splashFail = why => { const el = document.getElementById('splash'); if (!el || el.classList.contains('done')) return; el.classList.add('failed'); document.getElementById('splash-why').textContent = why || ''; };
+window.addEventListener('error', e => { if (!window.gameBooted) window.splashFail(e.message); });
+setTimeout(() => { if (!window.gameBooted) window.splashFail('It is taking much longer than usual. Check your connection.'); }, 20000);
+splash(0.12, 'Raising the land…');
+</script>
 <canvas id="c"></canvas>
 
 <!-- Top: score, turn and stars -->
@@ -86,6 +171,7 @@
       <button class="btn blue" id="btn-maps">Map Editor</button>
       <button class="btn dark" id="btn-settings">Settings</button>
       <button class="btn dark" id="btn-howto">How to Play</button>
+      <button class="btn dark" id="btn-install" hidden>Install App</button>
     </div>
     <p class="build muted">Version <span id="build">dev</span></p>
   </section>
@@ -107,6 +193,10 @@
     <div id="online-setup" class="online-box" hidden>
       <p><b>Online play isn't switched on for this copy of the game.</b></p>
       <p class="muted">It needs a free Supabase project. Follow "Online play" in the README to create one, then put its URL and public key in config.js.</p>
+    </div>
+    <div id="online-offline" class="online-box" hidden>
+      <p><b>You're offline.</b></p>
+      <p class="muted">Online games need a connection. Single-player, Pass &amp; Play and the map editor all work offline, and your online games will be here when you're back.</p>
     </div>
     <div id="online-main" class="online-box">
       <label class="set-label" for="online-name">Your name</label>
@@ -198,6 +288,7 @@
     </div>
     <p class="muted prefs-note" id="turn-note">Camera turning: use the arrows at the top right, <kbd>[</kbd> <kbd>]</kbd>, right-drag (up and down tilts), or twist two fingers.</p>
     <p class="muted prefs-note">Saved on this device. Every player can pick their own style, even in the same online game.</p>
+    <p class="prefs-note" id="offline-status"></p>
     <div class="row center"><button class="btn green" id="btn-prefs-done">Done</button></div>
   </div>
 </div>
@@ -261,6 +352,7 @@
       <li><b>Saving.</b> There are three save slots. Pick one when you start a game; it saves after every turn. Load or delete games under Saved Games.</li>
       <li><b>Controls.</b> Drag to pan, scroll or pinch to zoom. <kbd>E</kbd> end turn, <kbd>N</kbd> next unit, <kbd>T</kbd> tech tree, <kbd>Esc</kbd> close or deselect. Shaders can be switched off in Settings.</li>
       <li><b>Settings</b> (on the main menu and in the Game menu) change the look of the whole game, menus and land alike, and each style has its own cities and troops (sci-fi troopers on hoverbikes and glass-tower cities, fantasy knights, wizards and castles, or pixel-art armies): <i>Standard</i> (Polyweb's own faceted panels, hexagon buttons and paper-cut art), <i>Sci-fi</i> (neon panels, metal-plated land, force-field cities, a starfield), <i>Fantasy</i> (wood and gold, storybook ink outlines, warm light) or <i>Nostalgic</i> (chunky pixels, an 8-bit palette, black outlines, TV scanlines). Your choice is kept on this device.</li>
+      <li><b>Offline and installing.</b> After your first visit the game is kept on your device, so single-player, Pass &amp; Play and the map editor work with no connection (Settings shows when it's ready). To keep it like an app: on a computer or Android, press <i>Install App</i> on the main menu (or use the browser's install button); on an iPhone or iPad, tap Share, then <i>Add to Home Screen</i>. Online games need a connection.</li>
       <li><b>Camera turning</b> (switch it on in Settings) lets you spin the map and tilt the view: use the arrows at the top right (the compass in the middle faces the standard way again), <kbd>[</kbd> and <kbd>]</kbd>, drag with the right mouse button (up and down tilts), or twist two fingers. The map turns in 3D while trees, cities and units stay upright pictures.</li>
     </ul>
     <div class="row center"><button class="btn green" id="btn-help-close">Got it</button></div>
