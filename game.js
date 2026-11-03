@@ -1,5 +1,5 @@
 'use strict';
-window.splash?.(0.4, 'Training the tribes…');
+window.splash?.(0.4, 'tribes');
 /* Polyweb – a small isometric turn-based strategy game. No dependencies. */
 
 /* ---------- data ---------- */
@@ -6380,14 +6380,14 @@ addEventListener('online', () => { toast('Back online.'); if (!$('scr-online').h
 
 /* ---------- boot ---------- */
 document.body.dataset.theme = theme;
-window.splash?.(0.62, 'Drawing the world…');
+window.splash?.(0.62, 'world');
 resize(); showScreen('home'); requestAnimationFrame(draw);
 window.gameBooted = true;
 { // the loading screen lifts once the first frames of the world are drawn and the lettering has arrived
   const fonts = document.fonts ? Promise.race([document.fonts.ready, new Promise(r => setTimeout(r, 2500))]) : Promise.resolve();
   requestAnimationFrame(() => requestAnimationFrame(() => {
-    window.splash?.(0.85, 'Hoisting the flags…');
-    fonts.then(() => window.splash?.(1, 'Ready!'));
+    window.splash?.(0.85, 'flags');
+    fonts.then(() => window.splash?.(1, 'ready'));
   }));
 }
 // Keep a game in progress when this page is hot-reloaded inside an artifact viewer.
