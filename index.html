@@ -4,12 +4,182 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>Polyweb</title>
+<meta name="description" content="Build a tribe into an empire: a low-poly strategy game for the browser that also plays offline.">
+<meta name="theme-color" content="#0d3247">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Polyweb">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<script>try { document.documentElement.dataset.theme = localStorage.getItem('polyweb-theme') || 'standard'; } catch (e) { /* the loading screen falls back to the standard look */ }</script>
+<style>
+/* The loading screen: painted straight from here, before the stylesheet, the fonts and the game script arrive */
+#splash{--b1:#0d3247;--b2:#04131d;--ac:#ff7457;--ac2:#ffc94a;--tx:#f2fbff;--mu:#9fc6d8;--fn:"Fredoka","Arial Rounded MT Bold","Trebuchet MS",system-ui,sans-serif;
+  position:fixed;inset:0;z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px;
+  background:radial-gradient(ellipse at 50% 42%,var(--b1),var(--b2) 75%);color:var(--tx);font:600 15px/1.4 var(--fn);text-align:center;
+  transition:opacity .55s ease,visibility .55s;-webkit-user-select:none;user-select:none}
+html[data-theme="scifi"] #splash{--b1:#0e1a52;--b2:#01020a;--ac:#36f0ff;--ac2:#ff5ce8;--tx:#e6fbff;--mu:#8db3d6;--fn:"Orbitron","Eurostile",system-ui,sans-serif}
+html[data-theme="fantasy"] #splash{--b1:#4a3118;--b2:#120902;--ac:#f2c75c;--ac2:#c9a24a;--tx:#f8ead0;--mu:#d2b88c;--fn:"Cinzel",Georgia,serif}
+html[data-theme="nostalgic"] #splash{--b1:#10108a;--b2:#000;--ac:#fcd800;--ac2:#f83800;--tx:#fff;--mu:#bcbcbc;--fn:"Press Start 2P","Courier New",monospace}
+#splash.done{opacity:0;visibility:hidden;pointer-events:none}
+#splash svg{width:min(240px,62vw);height:auto;overflow:visible}
+#splash .sp-logo{font:700 clamp(40px,11vw,64px)/1 var(--fn);letter-spacing:1px;margin-top:4px;text-shadow:0 4px 0 var(--ac),0 10px 24px rgba(0,0,0,.45)}
+html[data-theme="nostalgic"] #splash .sp-logo{font-size:clamp(24px,7vw,40px);text-shadow:4px 4px 0 var(--ac2),8px 8px 0 #000;color:var(--ac)}
+#splash .sp-bar{width:min(280px,72vw);height:12px;border-radius:999px;background:rgba(255,255,255,.12);overflow:hidden;margin-top:14px;box-shadow:inset 0 2px 4px rgba(0,0,0,.35)}
+#splash .sp-fill{height:100%;width:var(--p,4%);border-radius:inherit;background:linear-gradient(90deg,var(--ac),var(--ac2));transition:width .35s ease}
+html[data-theme="nostalgic"] #splash .sp-bar,html[data-theme="nostalgic"] #splash .sp-fill{border-radius:0}
+html[data-theme="nostalgic"] #splash .sp-bar{border:3px solid #fff;height:16px}
+html[data-theme="scifi"] #splash .sp-bar{border-radius:0;border:1px solid rgba(54,240,255,.6)}
+html[data-theme="scifi"] #splash .sp-fill{border-radius:0;box-shadow:0 0 12px var(--ac)}
+#splash .sp-msg{color:var(--mu);font-size:13px;min-height:1.4em}
+#splash{overflow:hidden}
+html[data-theme="nostalgic"] #splash .sp-msg{font-size:10px}
+#splash .sp-err{display:none;max-width:320px}
+#splash.failed .sp-err{display:block}
+#splash.failed .sp-bar,#splash.failed #splash-msg{display:none}
+#splash .sp-err button{margin-top:10px;font:inherit;color:#fff;background:var(--ac);border:0;border-radius:12px;padding:10px 18px;cursor:pointer}
+#splash .scene{display:none}
+html:not([data-theme="scifi"]):not([data-theme="fantasy"]):not([data-theme="nostalgic"]) #splash .sc-standard,
+html[data-theme="scifi"] #splash .sc-scifi,html[data-theme="fantasy"] #splash .sc-fantasy,html[data-theme="nostalgic"] #splash .sc-nostalgic{display:block}
+html[data-theme="scifi"] #splash{background:radial-gradient(1px 1px at 12% 20%,#fff,transparent),radial-gradient(1px 1px at 80% 12%,#7ff3ff,transparent),radial-gradient(1.5px 1.5px at 66% 78%,#ff7ae6,transparent),
+  radial-gradient(1px 1px at 30% 70%,#fff,transparent),radial-gradient(1px 1px at 90% 60%,#fff,transparent),radial-gradient(ellipse at 50% 42%,var(--b1),var(--b2) 75%)}
+html[data-theme="nostalgic"] #splash::after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(rgba(0,0,0,.28) 0 2px,transparent 2px 4px)}
+html[data-theme="fantasy"] #splash{background:radial-gradient(ellipse at 50% 38%,#6b4a24,var(--b1) 40%,var(--b2) 80%)}
+#splash .tw{animation:sp-tw 1.8s ease-in-out infinite}
+#splash .ship{animation:sp-ship 4.5s linear infinite}
+#splash .ring{transform-origin:100px 52px;animation:sp-spin 3s linear infinite}
+#splash .crystal{animation:sp-bob 2.4s ease-in-out infinite}
+#splash .dragon{offset-path:path("M100 70 m-88 0 a88 34 0 1 0 176 0 a88 34 0 1 0 -176 0");offset-rotate:auto;animation:sp-fly 7s linear infinite}
+#splash .wing{transform-origin:1px -1px;animation:sp-flap .35s ease-in-out infinite alternate}
+#splash .cloud{animation:sp-cloud 9s steps(36) infinite}
+#splash .cloud.c2{animation-duration:13s;animation-delay:-6s}
+#splash .coin{animation:sp-coin .8s steps(2) infinite}
+@keyframes sp-tw{50%{opacity:.25}}
+@keyframes sp-ship{from{transform:translate(-30px,40px)}to{transform:translate(230px,26px)}}
+@keyframes sp-spin{to{transform:rotate(360deg)}}
+@keyframes sp-fly{to{offset-distance:100%}}
+@keyframes sp-flap{to{transform:scaleY(-.6)}}
+@keyframes sp-cloud{from{transform:translateX(-40px)}to{transform:translateX(220px)}}
+@keyframes sp-coin{50%{transform:scaleX(.3);transform-origin:127px 60px}}
+#splash .tile{animation:sp-rise .7s cubic-bezier(.2,1.4,.4,1) backwards}
+#splash .t2{animation-delay:.12s}#splash .t3{animation-delay:.24s}#splash .t4{animation-delay:.36s}#splash .thing{animation:sp-pop .5s cubic-bezier(.2,1.6,.4,1) .6s backwards}
+#splash .island{animation:sp-bob 3.2s ease-in-out 1.2s infinite}
+#splash .flag{transform-origin:118px 22px;animation:sp-wave 1s ease-in-out infinite alternate}
+#splash .ripple{transform-origin:100px 104px;animation:sp-ripple 2.6s ease-out infinite}
+#splash .ripple.r2{animation-delay:1.3s}
+@keyframes sp-rise{from{transform:translateY(-34px);opacity:0}}
+@keyframes sp-pop{from{transform:scale(.2) translateY(20px);opacity:0}}
+@keyframes sp-bob{50%{transform:translateY(-4px)}}
+@keyframes sp-wave{to{transform:skewY(-12deg) scaleX(.85)}}
+@keyframes sp-ripple{from{transform:scale(.7);opacity:.7}to{transform:scale(1.25);opacity:0}}
+@media (prefers-reduced-motion:reduce){#splash *{animation:none!important}}
+</style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;800&family=Orbitron:wght@500;700;900&family=Exo+2:wght@400;600;800&family=Cinzel:wght@600;700;900&family=Alegreya:wght@400;600;800&family=Press+Start+2P&family=Pixelify+Sans:wght@400;600;700&display=swap">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<div id="splash" role="status" aria-live="polite">
+  <svg class="scene sc-standard" viewBox="0 0 200 150" aria-hidden="true">
+    <ellipse class="ripple" cx="100" cy="104" rx="86" ry="30" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="2"/>
+    <ellipse class="ripple r2" cx="100" cy="104" rx="86" ry="30" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="2"/>
+    <ellipse cx="100" cy="102" rx="78" ry="28" fill="#3d96d7"/><ellipse cx="100" cy="99" rx="62" ry="21" fill="#5ccde0"/>
+    <g class="island">
+      <g class="tile"><path d="M100 34l32 16-32 16-32-16z" fill="#7fd35e"/><path d="M68 50l32 16v10L68 60z" fill="#a8774a"/><path d="M100 66l32-16v10l-32 16z" fill="#8a5e38"/></g>
+      <g class="tile t2"><path d="M68 50l32 16-32 16-32-16z" fill="#6cc24e"/><path d="M36 66l32 16v10L36 76z" fill="#a8774a"/><path d="M68 82l32-16v10L68 92z" fill="#8a5e38"/></g>
+      <g class="tile t3"><path d="M132 50l32 16-32 16-32-16z" fill="#76cb56"/><path d="M100 66l32 16v10l-32-16z" fill="#a8774a"/><path d="M132 82l32-16v10l-32 16z" fill="#8a5e38"/></g>
+      <g class="tile t4"><path d="M100 66l32 16-32 16-32-16z" fill="#84d964"/><path d="M68 82l32 16v10L68 92z" fill="#a8774a"/><path d="M100 98l32-16v10l-32 16z" fill="#8a5e38"/></g>
+      <g class="thing"><path d="M58 70l9-22 9 22z" fill="#3f9a45"/><path d="M67 48l9 22h-9z" fill="#2f7d38"/><path d="M62 58l5-14 5 14z" fill="#4fb055"/></g>
+      <g class="thing"><path d="M120 72l14-28 14 28z" fill="#9aa3b2"/><path d="M134 44l14 28h-14z" fill="#7b8494"/><path d="M129 52l5-8 5 8-5 3z" fill="#fff"/></g>
+      <g class="thing"><path d="M90 52v-14h20v14l-10 5z" fill="#f2ead8"/><path d="M100 57V38h10v14z" fill="#d8ccb2"/><path d="M87 39l13-9 13 9z" fill="var(--ac)"/><path d="M100 30l13 9h-13z" fill="rgba(0,0,0,.18)"/>
+        <path d="M117 38V18" stroke="#3c3c3c" stroke-width="1.6"/><path class="flag" d="M118 19h12l-3 4 3 4h-12z" fill="var(--ac2)"/></g>
+      <g class="thing"><path d="M98 92c0-4 6-4 6 0v4h-6z" fill="#e8403a"/><circle cx="96" cy="86" r="3" fill="#ffd34d"/></g>
+    </g>
+  </svg>
+  <svg class="scene sc-scifi" viewBox="0 0 200 150" aria-hidden="true">
+    <g><circle class="tw" cx="14" cy="18" r="1.2" fill="#fff" style="animation-delay:0s"/><circle class="tw" cx="40" cy="8" r="0.8" fill="#7ff3ff" style="animation-delay:0.6s"/><circle class="tw" cx="66" cy="26" r="1" fill="#fff" style="animation-delay:1.1s"/><circle class="tw" cx="150" cy="10" r="1.3" fill="#ff7ae6" style="animation-delay:0.3s"/><circle class="tw" cx="178" cy="30" r="0.9" fill="#fff" style="animation-delay:0.9s"/><circle class="tw" cx="190" cy="62" r="1.1" fill="#7ff3ff" style="animation-delay:1.4s"/><circle class="tw" cx="8" cy="58" r="0.9" fill="#fff" style="animation-delay:0.5s"/><circle class="tw" cx="28" cy="92" r="0.8" fill="#ff7ae6" style="animation-delay:1.2s"/><circle class="tw" cx="172" cy="96" r="1" fill="#fff" style="animation-delay:0.2s"/><circle class="tw" cx="120" cy="4" r="0.9" fill="#fff" style="animation-delay:0.8s"/><circle class="tw" cx="92" cy="14" r="0.7" fill="#7ff3ff" style="animation-delay:1.6s"/></g>
+    <ellipse class="ripple" cx="100" cy="104" rx="80" ry="26" fill="none" stroke="rgba(54,240,255,.55)" stroke-width="1.5"/>
+    <ellipse class="ripple r2" cx="100" cy="104" rx="80" ry="26" fill="none" stroke="rgba(255,92,232,.45)" stroke-width="1.5"/>
+    <ellipse cx="100" cy="118" rx="46" ry="7" fill="rgba(54,240,255,.35)"/>
+    <g class="island">
+      <g class="tile"><ellipse cx="100" cy="106" rx="70" ry="23" fill="#1b2136"/><ellipse cx="100" cy="101" rx="68" ry="21" fill="#3c4766"/>
+        <ellipse cx="100" cy="101" rx="60" ry="18" fill="none" stroke="#36f0ff" stroke-opacity=".75"/><ellipse cx="100" cy="101" rx="46" ry="13.5" fill="none" stroke="#ff5ce8" stroke-opacity=".45" stroke-dasharray="4 5"/></g>
+      <g class="tile t2"><rect x="62" y="54" width="16" height="44" fill="#d9e0ea"/><rect x="70" y="54" width="8" height="44" fill="#9aa4b8"/>
+        <path d="M62 62h16M62 70h16M62 78h16M62 86h16" stroke="#36f0ff" stroke-width="1.4"/><ellipse cx="70" cy="98" rx="8" ry="3" fill="#9aa4b8"/><path d="M62 54a8 8 0 0 1 16 0z" fill="rgba(98,244,255,.85)"/></g>
+      <g class="tile t3"><rect x="122" y="64" width="16" height="36" fill="#d9e0ea"/><rect x="130" y="64" width="8" height="36" fill="#9aa4b8"/>
+        <path d="M122 72h16M122 80h16M122 88h16" stroke="var(--ac2)" stroke-width="1.4"/><ellipse cx="130" cy="64" rx="8" ry="3" fill="#eef2f7"/><path d="M130 61v-9" stroke="#5c6680" stroke-width="1.2"/><circle class="tw" cx="130" cy="51" r="1.8" fill="#ff5ce8"/></g>
+      <g class="tile t4"><rect x="94" y="30" width="12" height="70" fill="#eef2f7"/><rect x="100" y="30" width="6" height="70" fill="#a6b0c3"/>
+        <path d="M94 40h12M94 50h12M94 60h12M94 70h12M94 80h12M94 90h12" stroke="#36f0ff" stroke-width="1.2"/><path d="M94 30l6-12 6 12z" fill="#eef2f7"/>
+        <ellipse class="ring" cx="100" cy="52" rx="15" ry="4.5" fill="none" stroke="var(--ac2)" stroke-width="2"/><circle cx="100" cy="15" r="4" fill="rgba(98,244,255,.5)"/><circle cx="100" cy="15" r="2" fill="#fff"/></g>
+      <g class="thing"><path d="M76 110a10 10 0 0 1 20 0z" fill="rgba(98,244,255,.8)"/><path d="M86 100a10 10 0 0 1 10 10h-10z" fill="rgba(40,140,190,.8)"/><rect x="84" y="106" width="4" height="4" fill="var(--ac2)"/></g>
+      <g class="thing"><path d="M108 112a8 8 0 0 1 16 0z" fill="rgba(98,244,255,.8)"/></g>
+    </g>
+    <g class="ship"><path d="M0 0l14-4 10 4-10 3z" fill="#d9e0ea"/><path d="M14-4l10 4h-10z" fill="#9aa4b8"/><path d="M8-2h6" stroke="#36f0ff" stroke-width="1.6"/><ellipse cx="-2" cy="0" rx="4" ry="1.6" fill="rgba(98,244,255,.8)"/></g>
+  </svg>
+  <svg class="scene sc-fantasy" viewBox="0 0 200 150" aria-hidden="true">
+    <g fill="#ffe9a0">
+      <path class="tw" d="M30 30l1.5 4 4 1.5-4 1.5-1.5 4-1.5-4-4-1.5 4-1.5z" style="animation-delay:.2s"/><path class="tw" d="M172 22l1.2 3 3 1.2-3 1.2-1.2 3-1.2-3-3-1.2 3-1.2z" style="animation-delay:.9s"/>
+      <path class="tw" d="M160 78l1 2.6 2.6 1-2.6 1-1 2.6-1-2.6-2.6-1 2.6-1z" style="animation-delay:1.4s"/><path class="tw" d="M22 86l1 2.6 2.6 1-2.6 1-1 2.6-1-2.6-2.6-1 2.6-1z" style="animation-delay:.6s"/>
+    </g>
+    <ellipse class="ripple" cx="100" cy="106" rx="84" ry="28" fill="none" stroke="rgba(255,236,170,.4)" stroke-width="1.5"/>
+    <ellipse cx="100" cy="104" rx="78" ry="27" fill="#2f7273"/><ellipse cx="100" cy="101" rx="62" ry="20" fill="#5cb09c"/>
+    <g class="island">
+      <g class="tile"><path d="M100 40l46 23-46 23-46-23z" fill="#8fbf4e"/><path d="M54 63l46 23v12L54 75z" fill="#9a6b3e"/><path d="M100 86l46-23v12l-46 23z" fill="#7a5230"/>
+        <path d="M54 63l46 23 46-23M54 75l46 23 46-23" fill="none" stroke="rgba(52,28,8,.55)" stroke-width="1"/></g>
+      <g class="tile t2"><rect x="84" y="40" width="32" height="26" fill="#e6dcc8"/><rect x="100" y="40" width="16" height="26" fill="#b9ae98"/>
+        <path d="M84 40v-4h5v4h4v-4h5v4h4v-4h5v4h4v-4h5v4" fill="none" stroke="#e6dcc8" stroke-width="3"/><path d="M96 66v-9a4 4 0 0 1 8 0v9z" fill="#3a2a1a"/></g>
+      <g class="tile t3"><rect x="72" y="34" width="12" height="34" fill="#e6dcc8"/><rect x="78" y="34" width="6" height="34" fill="#b9ae98"/><path d="M69 34l9-20 9 20z" fill="var(--ac2)"/><path d="M78 14l9 20h-9z" fill="rgba(0,0,0,.2)"/>
+        <path d="M78 14V6" stroke="#4a3a2e" stroke-width="1.2"/><path class="flag" style="transform-origin:78px 7px" d="M78 6h9l-2 3 2 3h-9z" fill="#c0392b"/></g>
+      <g class="tile t4"><rect x="116" y="38" width="12" height="30" fill="#e6dcc8"/><rect x="122" y="38" width="6" height="30" fill="#b9ae98"/><path d="M113 38l9-18 9 18z" fill="var(--ac2)"/><path d="M122 20l9 18h-9z" fill="rgba(0,0,0,.2)"/>
+        <path d="M122 20v-8" stroke="#4a3a2e" stroke-width="1.2"/><path class="flag" style="transform-origin:122px 13px" d="M122 12h9l-2 3 2 3h-9z" fill="#2c6a5e"/></g>
+      <g class="thing"><path d="M58 70l7-16 7 16z" fill="#3f7d38"/><path d="M134 72l7-16 7 16z" fill="#3f7d38"/><path d="M62 60l3-8 3 8z" fill="#5a9a48"/></g>
+      <g class="crystal"><path d="M100 2l5 10-5 10-5-10z" fill="#d9c6ff" stroke="#8a5ae0" stroke-width=".8"/><path d="M100 2l5 10-5 10z" fill="#b79cf0"/></g>
+    </g>
+    <g class="dragon"><path d="M-9 0q5-3 9-1 4-1 8 1l3-2-1 3q-4 3-10 2-6 1-9-3z" fill="#c0392b"/><path class="wing" d="M-2-1l3-8 4 7z" fill="#e8604c"/><circle cx="9" cy="-1" r=".7" fill="#ffe27a"/></g>
+  </svg>
+  <svg class="scene sc-nostalgic" viewBox="0 0 200 150" aria-hidden="true" shape-rendering="crispEdges">
+    <g class="cloud"><rect x="0" y="16" width="24" height="8" fill="#fcfcfc"/><rect x="4" y="12" width="12" height="4" fill="#fcfcfc"/><rect x="0" y="24" width="24" height="2" fill="#bcbcbc"/></g>
+    <g class="cloud c2"><rect x="0" y="30" width="32" height="8" fill="#fcfcfc"/><rect x="8" y="26" width="16" height="4" fill="#fcfcfc"/><rect x="0" y="38" width="32" height="2" fill="#bcbcbc"/></g>
+    <g class="blink"><rect x="20" y="100" width="160" height="4" fill="#0838a8"/><rect x="12" y="104" width="176" height="4" fill="#1858d0"/><rect x="20" y="108" width="160" height="4" fill="#0838a8"/></g>
+    <g class="island">
+      <g class="tile"><rect x="60" y="72" width="80" height="4" fill="#00a800"/><rect x="48" y="76" width="104" height="4" fill="#00a800"/><rect x="40" y="80" width="120" height="4" fill="#00a800"/><rect x="36" y="84" width="128" height="4" fill="#00a800"/><rect x="36" y="88" width="128" height="4" fill="#a85820"/><rect x="40" y="92" width="120" height="4" fill="#a85820"/><rect x="48" y="96" width="104" height="4" fill="#a85820"/><rect x="36" y="88" width="128" height="4" fill="#503000"/><rect x="44" y="80" width="8" height="4" fill="#58f858"/><rect x="120" y="76" width="12" height="4" fill="#58f858"/></g>
+      <g class="tile t3"><rect x="84" y="44" width="32" height="32" fill="#000"/><rect x="88" y="48" width="24" height="28" fill="#bcbcbc"/><rect x="100" y="48" width="12" height="28" fill="#7c7c7c"/><rect x="84" y="40" width="4" height="4" fill="#000"/><rect x="84" y="40" width="4" height="4" fill="#000"/><rect x="92" y="40" width="4" height="4" fill="#000"/><rect x="92" y="40" width="4" height="4" fill="#000"/><rect x="100" y="40" width="4" height="4" fill="#000"/><rect x="100" y="40" width="4" height="4" fill="#000"/><rect x="108" y="40" width="4" height="4" fill="#000"/><rect x="108" y="40" width="4" height="4" fill="#000"/><rect x="88" y="40" width="4" height="8" fill="#bcbcbc"/><rect x="96" y="40" width="4" height="8" fill="#bcbcbc"/><rect x="104" y="40" width="4" height="8" fill="#bcbcbc"/><rect x="96" y="64" width="8" height="12" fill="#503000"/><rect x="92" y="54" width="4" height="4" fill="#000"/><rect x="104" y="54" width="4" height="4" fill="#000"/><rect x="98" y="24" width="2" height="16" fill="#000"/><rect x="100" y="24" width="10" height="6" fill="#f83800"/></g>
+      <g class="thing"><rect x="52" y="60" width="8" height="12" fill="#00a800"/><rect x="48" y="64" width="16" height="4" fill="#00a800"/><rect x="54" y="72" width="4" height="4" fill="#a85820"/>
+        <rect x="140" y="60" width="8" height="12" fill="#00a800"/><rect x="136" y="64" width="16" height="4" fill="#00a800"/><rect x="142" y="72" width="4" height="4" fill="#a85820"/>
+        <rect class="coin" x="124" y="56" width="6" height="8" fill="#fcd800"/></g>
+    </g>
+  </svg>
+  <div class="sp-logo">Polyweb</div>
+  <div class="sp-bar"><div class="sp-fill" id="splash-fill"></div></div>
+  <div class="sp-msg" id="splash-msg"></div>
+  <div class="sp-err"><p>The game couldn't finish loading.</p><p class="sp-msg" id="splash-why"></p><button type="button" onclick="location.reload()">Try again</button></div>
+</div>
+<script>
+// Loading progress: the page and the game call splash(step) as they get ready; splash(1) hides the screen.
+window.splashT0 = performance.now();
+// Each style has its own loading lines; the game names the step and the line comes from here.
+window.splashLines = {
+  standard: { land: 'Raising the land…', tribes: 'Training the tribes…', world: 'Drawing the world…', flags: 'Hoisting the flags…', ready: 'Ready!' },
+  scifi: { land: 'Powering up the reactors…', tribes: 'Deploying troopers…', world: 'Rendering the grid…', flags: 'Syncing satellites…', ready: 'Systems online' },
+  fantasy: { land: 'Summoning the land…', tribes: 'Rallying the knights…', world: 'Painting the realm…', flags: 'Raising the banners…', ready: 'The realm awaits' },
+  nostalgic: { land: 'INSERT COIN…', tribes: 'LOADING TRIBES…', world: 'DRAWING THE MAP…', flags: 'BLOWING ON THE CARTRIDGE…', ready: 'PRESS START!' },
+};
+window.splash = (p, step) => {
+  const el = document.getElementById('splash');
+  if (!el || el.classList.contains('done')) return;
+  document.getElementById('splash-fill').style.setProperty('--p', Math.round(p * 100) + '%');
+  const lines = splashLines[document.documentElement.dataset.theme] || splashLines.standard;
+  if (step) document.getElementById('splash-msg').textContent = lines[step] || step;
+  if (p >= 1) setTimeout(() => { el.classList.add('done'); setTimeout(() => el.remove(), 700); }, Math.max(250, 1100 - (performance.now() - window.splashT0)));
+};
+window.splashFail = why => { const el = document.getElementById('splash'); if (!el || el.classList.contains('done')) return; el.classList.add('failed'); document.getElementById('splash-why').textContent = why || ''; };
+window.addEventListener('error', e => { if (!window.gameBooted) window.splashFail(e.message); });
+setTimeout(() => { if (!window.gameBooted) window.splashFail('It is taking much longer than usual. Check your connection.'); }, 20000);
+splash(0.12, 'land');
+</script>
 <canvas id="c"></canvas>
 
 <!-- Top: score, turn and stars -->
@@ -86,6 +256,7 @@
       <button class="btn blue" id="btn-maps">Map Editor</button>
       <button class="btn dark" id="btn-settings">Settings</button>
       <button class="btn dark" id="btn-howto">How to Play</button>
+      <button class="btn dark" id="btn-install" hidden>Install App</button>
     </div>
     <p class="build muted">Version <span id="build">dev</span></p>
   </section>
@@ -107,6 +278,10 @@
     <div id="online-setup" class="online-box" hidden>
       <p><b>Online play isn't switched on for this copy of the game.</b></p>
       <p class="muted">It needs a free Supabase project. Follow "Online play" in the README to create one, then put its URL and public key in config.js.</p>
+    </div>
+    <div id="online-offline" class="online-box" hidden>
+      <p><b>You're offline.</b></p>
+      <p class="muted">Online games need a connection. Single-player, Pass &amp; Play and the map editor all work offline, and your online games will be here when you're back.</p>
     </div>
     <div id="online-main" class="online-box">
       <label class="set-label" for="online-name">Your name</label>
@@ -198,6 +373,7 @@
     </div>
     <p class="muted prefs-note" id="turn-note">Camera turning: use the arrows at the top right, <kbd>[</kbd> <kbd>]</kbd>, right-drag (up and down tilts), or twist two fingers.</p>
     <p class="muted prefs-note">Saved on this device. Every player can pick their own style, even in the same online game.</p>
+    <p class="prefs-note" id="offline-status"></p>
     <div class="row center"><button class="btn green" id="btn-prefs-done">Done</button></div>
   </div>
 </div>
@@ -261,6 +437,7 @@
       <li><b>Saving.</b> There are three save slots. Pick one when you start a game; it saves after every turn. Load or delete games under Saved Games.</li>
       <li><b>Controls.</b> Drag to pan, scroll or pinch to zoom. <kbd>E</kbd> end turn, <kbd>N</kbd> next unit, <kbd>T</kbd> tech tree, <kbd>Esc</kbd> close or deselect. Shaders can be switched off in Settings.</li>
       <li><b>Settings</b> (on the main menu and in the Game menu) change the look of the whole game, menus and land alike, and each style has its own cities and troops (sci-fi troopers on hoverbikes and glass-tower cities, fantasy knights, wizards and castles, or pixel-art armies): <i>Standard</i> (Polyweb's own faceted panels, hexagon buttons and paper-cut art), <i>Sci-fi</i> (neon panels, metal-plated land, force-field cities, a starfield), <i>Fantasy</i> (wood and gold, storybook ink outlines, warm light) or <i>Nostalgic</i> (chunky pixels, an 8-bit palette, black outlines, TV scanlines). Your choice is kept on this device.</li>
+      <li><b>Offline and installing.</b> After your first visit the game is kept on your device, so single-player, Pass &amp; Play and the map editor work with no connection (Settings shows when it's ready). To keep it like an app: on a computer or Android, press <i>Install App</i> on the main menu (or use the browser's install button); on an iPhone or iPad, tap Share, then <i>Add to Home Screen</i>. Online games need a connection.</li>
       <li><b>Camera turning</b> (switch it on in Settings) lets you spin the map and tilt the view: use the arrows at the top right (the compass in the middle faces the standard way again), <kbd>[</kbd> and <kbd>]</kbd>, drag with the right mouse button (up and down tilts), or twist two fingers. The map turns in 3D while trees, cities and units stay upright pictures.</li>
     </ul>
     <div class="row center"><button class="btn green" id="btn-help-close">Got it</button></div>

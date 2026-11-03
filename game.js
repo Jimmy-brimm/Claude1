@@ -1,4 +1,5 @@
 'use strict';
+window.splash?.(0.4, 'tribes');
 /* Polyweb – a small isometric turn-based strategy game. No dependencies. */
 
 /* ---------- data ---------- */
@@ -5614,7 +5615,7 @@ function renderPrefs() {
   $('set-fx').disabled = !postfx.available;
   $('set-turn').textContent = turnOn ? 'Camera turning: on' : 'Camera turning: off';
 }
-function openPrefs() { sfx('click'); renderPrefs(); $('prefs').hidden = false; }
+function openPrefs() { sfx('click'); renderPrefs(); renderOfflineStatus(); checkOffline(); $('prefs').hidden = false; }
 const closePrefs = () => { $('prefs').hidden = true; };
 $('btn-settings').onclick = openPrefs;
 $('gm-settings').onclick = openPrefs;
@@ -6242,10 +6243,11 @@ function askNotify() { try { if (window.Notification && Notification.permission 
 
 // The Online Play screen
 function renderOnline() {
-  const ready = netReady();
+  const ready = netReady(), offline = navigator.onLine === false;
   $('online-setup').hidden = ready;
-  $('online-main').hidden = !ready;
-  if (!ready) return;
+  $('online-offline').hidden = !(ready && offline);
+  $('online-main').hidden = !ready || offline;
+  if (!ready || offline) return;
   $('online-name').value = store.get(NET_NAME, '');
   const list = netGames();
   $('online-list').innerHTML = list.length ? list.map(e => `<div class="save-card online-card" data-id="${e.id}"><div class="save-text"><b>${e.id}</b><span class="muted">Loading…</span></div>
@@ -6340,9 +6342,54 @@ function showShare(seat) { // an invite for friends, or (seat) a private link th
 $('gm-invite').onclick = () => { $('game-menu').hidden = true; showShare(false); };
 $('gm-seat').onclick = () => { $('game-menu').hidden = true; showShare(true); };
 
+/* ---------- offline play and installing ---------- */
+// sw.js keeps the game on the device after the first visit (see the notes there). Inside a sandboxed
+// preview there is no sw.js to find, and registering simply fails quietly.
+let offlineReady = false, installPrompt = null;
+function renderOfflineStatus() {
+  const el = $('offline-status');
+  if (!el) return;
+  el.className = 'prefs-note ' + (offlineReady ? 'ok' : 'muted');
+  el.textContent = offlineReady ? '✓ Ready to play offline: single-player, Pass & Play and the map editor work with no connection.'
+    : 'swCapable' in window && !window.swCapable ? 'Offline play needs the game to be opened from its website.' : 'Getting ready for offline play…';
+}
+async function checkOffline() {
+  try { offlineReady = !!(window.caches && await caches.match('./') && navigator.serviceWorker && navigator.serviceWorker.controller); } catch (e) { offlineReady = false; }
+  renderOfflineStatus();
+}
+window.swCapable = 'serviceWorker' in navigator && window.isSecureContext && /^https?:$/.test(location.protocol) && !window.POLYWEB_BUNDLE; // a single-file copy has no sw.js
+if (window.swCapable) {
+  navigator.serviceWorker.register('sw.js').then(reg => {
+    const settle = () => setTimeout(checkOffline, 1500);
+    if (reg.installing) reg.installing.addEventListener('statechange', e => { if (e.target.state === 'activated') settle(); });
+    navigator.serviceWorker.addEventListener('controllerchange', settle);
+    settle();
+  }).catch(() => { window.swCapable = false; renderOfflineStatus(); });
+}
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); installPrompt = e; $('btn-install').hidden = false; });
+addEventListener('appinstalled', () => { installPrompt = null; $('btn-install').hidden = true; toast('Polyweb is installed. Open it from your home screen or apps, even offline.'); });
+$('btn-install').onclick = async () => {
+  if (!installPrompt) return;
+  sfx('click'); installPrompt.prompt();
+  const choice = await installPrompt.userChoice.catch(() => null);
+  if (choice && choice.outcome === 'accepted') $('btn-install').hidden = true;
+  installPrompt = null;
+};
+addEventListener('offline', () => { toast("You're offline. Single-player, Pass & Play and the map editor keep working."); if (!$('scr-online').hidden) renderOnline(); });
+addEventListener('online', () => { toast('Back online.'); if (!$('scr-online').hidden) renderOnline(); });
+
 /* ---------- boot ---------- */
 document.body.dataset.theme = theme;
+window.splash?.(0.62, 'world');
 resize(); showScreen('home'); requestAnimationFrame(draw);
+window.gameBooted = true;
+{ // the loading screen lifts once the first frames of the world are drawn and the lettering has arrived
+  const fonts = document.fonts ? Promise.race([document.fonts.ready, new Promise(r => setTimeout(r, 2500))]) : Promise.resolve();
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    window.splash?.(0.85, 'flags');
+    fonts.then(() => window.splash?.(1, 'ready'));
+  }));
+}
 // Keep a game in progress when this page is hot-reloaded inside an artifact viewer.
 window.claude?.hot?.snapshot?.(() => (G && !G.over && !editing ? { G } : {}));
 function start(data) { if (data && data.G && data.G.v === 3) begin(data.G, true); }

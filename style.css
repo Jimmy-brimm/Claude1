@@ -601,3 +601,5 @@ body[data-theme="standard"] #turn-ctl button{border-radius:0;clip-path:polygon(2
 .theme-card[data-theme="standard"] .tc-btn{border-radius:0;clip-path:polygon(7px 0,calc(100% - 7px) 0,100% 50%,calc(100% - 7px) 100%,7px 100%,0 50%);
   background:var(--green);box-shadow:inset 0 -3px 0 var(--green-edge);padding:6px 13px 6px;font-weight:600}
 .theme-card[data-theme="standard"] .tc-view i{background:#7fd35e;filter:drop-shadow(0 0 1px #fff)}
+#offline-status{margin-top:6px}
+#offline-status.ok{color:var(--good);font-weight:700}
